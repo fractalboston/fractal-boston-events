@@ -1,5 +1,6 @@
 import { Kysely, PostgresDialect } from 'kysely'
 import { Pool } from 'pg'
+import { env } from '@/lib/env'
 
 export type SubscriberStatus = 'pending' | 'verified' | 'unsubscribed'
 
@@ -18,7 +19,7 @@ export type Database = {
 }
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 })
 

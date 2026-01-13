@@ -4,5 +4,13 @@
       "path": "/api/cron/weekly",
       "schedule": "0 13 * * 6"
     }
-  ]
+  ],
+  "functions": {
+    "src/pages/api/cron/weekly.ts": {
+      "maxDuration": 300
+    },
+    "src/pages/api/webhooks/luma/event.ts": {
+      "maxDuration": 300
+    }
+  }
 }

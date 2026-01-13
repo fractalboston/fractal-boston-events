@@ -9,7 +9,7 @@ import {
 import type { ApiResponse, ApiErrorResponse } from '@/lib/api-response'
 import { getAllVerifiedSubscribers } from '@/lib/subscribers'
 import { sendBatchEmails } from '@/lib/email'
-import { sendDiscordNewEventAlert } from '@/lib/discord'
+import { sendDiscordNewEventAlert, sendDiscordError } from '@/lib/discord'
 import { parseLumaEventCreatedWebhook, isEventWithinNextWeek } from '@/lib/luma'
 import { ZodError } from 'zod'
 
@@ -42,7 +42,7 @@ export default async function handler(
     }
 
     // Post to Discord
-    const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL
+    const discordWebhookUrl = env.DISCORD_WEBHOOK_URL
     if (discordWebhookUrl !== undefined) {
       try {
         await sendDiscordNewEventAlert(discordWebhookUrl, event)
@@ -53,9 +53,16 @@ export default async function handler(
 
     // Email all verified subscribers
     const subscribers = await getAllVerifiedSubscribers()
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
+    const appUrl = env.APP_URL
 
-    const { success } = await sendBatchEmails(subscribers, [], appUrl, 'new-event', event)
+    const { success } = await sendBatchEmails(
+      subscribers,
+      [],
+      appUrl,
+      'new-event',
+      event,
+      discordWebhookUrl
+    )
 
     sendSuccess(res, {
       message: `New event notification sent`,
@@ -67,6 +74,21 @@ export default async function handler(
       return
     }
     console.error('Luma event webhook error:', error)
+
+    // Log error to Discord
+    const discordWebhookUrl = env.DISCORD_WEBHOOK_URL
+    if (discordWebhookUrl !== undefined) {
+      try {
+        await sendDiscordError(
+          discordWebhookUrl,
+          error instanceof Error ? error : new Error(String(error)),
+          'Luma event webhook error'
+        )
+      } catch (discordError) {
+        console.error('Failed to log error to Discord:', discordError)
+      }
+    }
+
     sendInternalError(res, 'Failed to process webhook')
   }
 }

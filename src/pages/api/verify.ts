@@ -11,6 +11,7 @@ import type { ApiResponse, ApiErrorResponse } from '@/lib/api-response'
 import { verifySubscriber, getSubscriberByToken } from '@/lib/subscribers'
 import { sendWelcomeEmail } from '@/lib/email'
 import { fetchUpcomingEvents } from '@/lib/luma'
+import { sendDiscordError } from '@/lib/discord'
 
 const verifySchema = z.object({
   token: z.string().uuid(),
@@ -70,9 +71,9 @@ export default async function handler(
     }
 
     // Fetch upcoming events and send welcome email
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
-    const lumaApiKey = process.env.LUMA_API_KEY
-    const lumaCalendarId = process.env.LUMA_CALENDAR_ID
+    const appUrl = env.APP_URL
+    const lumaApiKey = env.LUMA_API_KEY
+    const lumaCalendarId = env.LUMA_CALENDAR_ID
 
     if (lumaApiKey !== undefined && lumaCalendarId !== undefined) {
       try {
@@ -90,6 +91,21 @@ export default async function handler(
     })
   } catch (error) {
     console.error('Verify error:', error)
+
+    // Log error to Discord
+    const discordWebhookUrl = env.DISCORD_WEBHOOK_URL
+    if (discordWebhookUrl !== undefined) {
+      try {
+        await sendDiscordError(
+          discordWebhookUrl,
+          error instanceof Error ? error : new Error(String(error)),
+          'Verify endpoint error'
+        )
+      } catch (discordError) {
+        console.error('Failed to log error to Discord:', discordError)
+      }
+    }
+
     sendInternalError(res, 'Failed to verify email')
   }
 }

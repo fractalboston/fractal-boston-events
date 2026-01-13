@@ -41,10 +41,12 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 | ----------------------------- | --------------------------------------------------- |
 | **Next.js 14 (Pages Router)** | Explicit requirement: no React Server Components    |
 | **TypeScript**                | Type safety, better DX                              |
+| **Turbopack**                 | Faster builds during development                    |
 | **Kysely**                    | Type-safe SQL query builder, no ORM magic           |
-| **Zod**                       | Runtime validation with TypeScript inference        |
+| **Zod v4**                    | Runtime validation with TypeScript inference        |
+| **env-var**                   | Type-safe environment variable validation           |
 | **Resend**                    | Simple email API, good free tier, easy domain setup |
-| **Vercel**                    | Free hosting, native cron support                   |
+| **Vercel**                    | Free hosting, native cron support, maxDuration=300s |
 | **Supabase**                  | Free Postgres, easy setup                           |
 
 ### Code Style Rules
@@ -52,9 +54,12 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 1. **Strict TypeScript** - No `any`, no `unknown` casts
 2. **Types over interfaces** - Consistent `type` keyword everywhere
 3. **Explicit return types** - All functions have declared return types
-4. **Zod for validation** - Runtime type checking at API boundaries
-5. **No React Server Components** - Classic Pages Router only
-6. **Yarn only** - No npm commands
+4. **Zod v4 for validation** - Runtime type checking at API boundaries (all external data: API inputs, fetch responses)
+5. **env-var for environment variables** - NEVER use `process.env` directly, ALWAYS use `env` from `src/lib/env.ts`
+6. **Absolute imports only** - Use `@/` imports, NEVER use relative imports (`./` or `../`)
+7. **No React Server Components** - Classic Pages Router only
+8. **Yarn only** - No npm commands
+9. **Prettier with import sorting** - Imports are automatically sorted using `@trivago/prettier-plugin-sort-imports`
 
 ### Security
 
@@ -72,6 +77,11 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 - **Welcome email** sent on verification with upcoming events
 - **Weekly digest** every Saturday 8am EST
 - **New event alerts** when event added <7 days out
+- **Email footer** includes links to:
+  - [fractal.boston](https://fractal.boston)
+  - [Calendar](https://lu.ma/fractalboston)
+  - [Discord](https://discord.gg/fractalboston)
+  - Unsubscribe link
 
 ### Database Schema
 
@@ -106,6 +116,8 @@ All endpoints return consistent JSON:
 ```
 
 Vercel cron uses UTC, so 8am EST = 13:00 UTC (accounting for EST = UTC-5).
+
+**Note**: Long-running endpoints (cron jobs, webhooks) have `maxDuration: 300` seconds configured in `vercel.json` to handle large batch operations.
 
 ## Environment Variables
 
@@ -151,6 +163,20 @@ Both webhooks need the `X-Luma-Signature` header set to your `LUMA_WEBHOOK_SECRE
 4. Get mod role ID (enable Developer Mode, right-click role)
 5. Set as `DISCORD_MOD_ROLE_ID`
 
+### Discord Logging Features
+
+The system automatically logs to Discord:
+
+- **Error Logging**: All errors from API endpoints are logged to Discord with stack traces
+- **Weekly Email Job Stats**: After sending weekly emails, logs stats including:
+  - Number of emails sent/failed
+  - Number of events included
+  - Total subscriber count
+  - Resend monthly usage estimate
+  - **Warning**: Alerts when approaching Resend monthly limit (75% threshold)
+- **Weekly Event Summary**: Posts upcoming events every Saturday (or alerts mods if no events)
+- **New Event Alerts**: Posts when new events are added <7 days out
+
 ## Development
 
 ```bash
@@ -160,8 +186,11 @@ yarn
 # Run migrations
 yarn db:migrate
 
-# Start dev server
+# Start dev server (with Turbopack)
 yarn dev
+
+# Run all checks (tests + lint + typecheck)
+yarn check
 
 # Run tests
 yarn test
@@ -169,7 +198,7 @@ yarn test
 # Lint
 yarn lint
 
-# Format
+# Format (with import sorting)
 yarn format
 ```
 
@@ -207,6 +236,7 @@ const response = await fetch('https://fb-events.vercel.app/api/subscribe', {
 - **Free tier limits**: Resend 3k emails/month (~750 weekly subscribers)
 - **Batch sending**: 50ms delay between emails to avoid rate limits
 - **Database**: Supabase free tier supports thousands of subscribers
+- **Monitoring**: System warns in Discord when approaching 75% of Resend monthly limit
 - **If scaling beyond free tier**: Consider Amazon SES ($0.10/1k emails)
 
 ## File Structure

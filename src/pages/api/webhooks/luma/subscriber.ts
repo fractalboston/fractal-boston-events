@@ -10,6 +10,7 @@ import type { ApiResponse, ApiErrorResponse } from '@/lib/api-response'
 import { createSubscriber, getSubscriberByEmail } from '@/lib/subscribers'
 import { sendWelcomeEmail } from '@/lib/email'
 import { fetchUpcomingEvents, parseLumaSubscriberWebhook } from '@/lib/luma'
+import { sendDiscordError } from '@/lib/discord'
 import { ZodError } from 'zod'
 
 type WebhookResponse = {
@@ -49,9 +50,9 @@ export default async function handler(
     })
 
     // Send welcome email with upcoming events
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
-    const lumaApiKey = process.env.LUMA_API_KEY
-    const lumaCalendarId = process.env.LUMA_CALENDAR_ID
+    const appUrl = env.APP_URL
+    const lumaApiKey = env.LUMA_API_KEY
+    const lumaCalendarId = env.LUMA_CALENDAR_ID
 
     if (lumaApiKey !== undefined && lumaCalendarId !== undefined) {
       try {
@@ -69,6 +70,21 @@ export default async function handler(
       return
     }
     console.error('Luma subscriber webhook error:', error)
+
+    // Log error to Discord
+    const discordWebhookUrl = env.DISCORD_WEBHOOK_URL
+    if (discordWebhookUrl !== undefined) {
+      try {
+        await sendDiscordError(
+          discordWebhookUrl,
+          error instanceof Error ? error : new Error(String(error)),
+          'Luma subscriber webhook error'
+        )
+      } catch (discordError) {
+        console.error('Failed to log error to Discord:', discordError)
+      }
+    }
+
     sendInternalError(res, 'Failed to process webhook')
   }
 }

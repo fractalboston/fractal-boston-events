@@ -11,6 +11,8 @@ import {
 import type { ApiResponse, ApiErrorResponse } from '@/lib/api-response'
 import { createSubscriber, getSubscriberByEmail, resubscribe } from '@/lib/subscribers'
 import { sendVerificationEmail } from '@/lib/email'
+import { sendDiscordError } from '@/lib/discord'
+import { env } from '@/lib/env'
 
 const subscribeSchema = z.object({
   email: z.string().email(),
@@ -42,7 +44,7 @@ export default async function handler(
   }
 
   const { email } = parsed.data
-  const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
+  const appUrl = env.APP_URL
 
   try {
     // Check if already subscribed
@@ -96,6 +98,18 @@ export default async function handler(
     })
   } catch (error) {
     console.error('Subscribe error:', error)
+
+    // Log error to Discord
+    try {
+      await sendDiscordError(
+        env.DISCORD_WEBHOOK_URL,
+        error instanceof Error ? error : new Error(String(error)),
+        'Subscribe endpoint error'
+      )
+    } catch (discordError) {
+      console.error('Failed to log error to Discord:', discordError)
+    }
+
     sendInternalError(res, 'Failed to process subscription')
   }
 }
