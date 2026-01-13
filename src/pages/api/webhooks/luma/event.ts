@@ -9,8 +9,9 @@ import {
 import type { ApiResponse, ApiErrorResponse } from '@/lib/api-response'
 import { getAllVerifiedSubscribers } from '@/lib/subscribers'
 import { sendBatchEmails } from '@/lib/email'
-import { sendDiscordNewEventAlert } from '@/lib/discord'
+import { sendDiscordNewEventAlert, sendDiscordError } from '@/lib/discord'
 import { parseLumaEventCreatedWebhook, isEventWithinNextWeek } from '@/lib/luma'
+import { env } from '@/lib/env'
 import { ZodError } from 'zod'
 
 type WebhookResponse = {
@@ -41,21 +42,24 @@ export default async function handler(
       return
     }
 
-    // Post to Discord
-    const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL
-    if (discordWebhookUrl !== undefined) {
-      try {
-        await sendDiscordNewEventAlert(discordWebhookUrl, event)
-      } catch (discordError) {
-        console.error('Failed to post to Discord:', discordError)
-      }
+    // Post new event alert to Discord events channel
+    try {
+      await sendDiscordNewEventAlert(env.DISCORD_EVENTS_WEBHOOK_URL, event)
+    } catch (discordError) {
+      console.error('Failed to post to Discord:', discordError)
     }
 
     // Email all verified subscribers
     const subscribers = await getAllVerifiedSubscribers()
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
 
-    const { success } = await sendBatchEmails(subscribers, [], appUrl, 'new-event', event)
+    const { success } = await sendBatchEmails(
+      subscribers,
+      [],
+      env.APP_URL,
+      'new-event',
+      event,
+      env.DISCORD_LOGGING_WEBHOOK_URL
+    )
 
     sendSuccess(res, {
       message: `New event notification sent`,
@@ -67,6 +71,18 @@ export default async function handler(
       return
     }
     console.error('Luma event webhook error:', error)
+
+    // Log error to Discord logging channel
+    try {
+      await sendDiscordError(
+        env.DISCORD_LOGGING_WEBHOOK_URL,
+        error instanceof Error ? error : new Error(String(error)),
+        'Luma event webhook error'
+      )
+    } catch (discordError) {
+      console.error('Failed to log error to Discord:', discordError)
+    }
+
     sendInternalError(res, 'Failed to process webhook')
   }
 }

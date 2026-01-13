@@ -9,6 +9,8 @@ import {
 } from '@/lib/api-response'
 import type { ApiResponse, ApiErrorResponse } from '@/lib/api-response'
 import { unsubscribe, getSubscriberByToken } from '@/lib/subscribers'
+import { sendDiscordError } from '@/lib/discord'
+import { env } from '@/lib/env'
 
 const unsubscribeSchema = z.object({
   token: z.string().uuid(),
@@ -68,6 +70,18 @@ export default async function handler(
     })
   } catch (error) {
     console.error('Unsubscribe error:', error)
+
+    // Log error to Discord logging channel
+    try {
+      await sendDiscordError(
+        env.DISCORD_LOGGING_WEBHOOK_URL,
+        error instanceof Error ? error : new Error(String(error)),
+        'Unsubscribe endpoint error'
+      )
+    } catch (discordError) {
+      console.error('Failed to log error to Discord:', discordError)
+    }
+
     sendInternalError(res, 'Failed to unsubscribe')
   }
 }

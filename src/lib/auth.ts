@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { sendUnauthorized } from './api-response'
-import type { ApiErrorResponse } from './api-response'
+import { sendUnauthorized } from '@/lib/api-response'
+import type { ApiErrorResponse } from '@/lib/api-response'
+import { env } from '@/lib/env'
 
 export function validateApiKey(
   req: NextApiRequest,
@@ -8,7 +9,7 @@ export function validateApiKey(
 ): boolean {
   const apiKey = req.headers['x-api-key']
 
-  if (typeof apiKey !== 'string' || apiKey !== process.env.SUBSCRIBE_API_KEY) {
+  if (typeof apiKey !== 'string' || apiKey !== env.SUBSCRIBE_API_KEY) {
     sendUnauthorized(res, 'Invalid or missing API key')
     return false
   }
@@ -27,7 +28,7 @@ export function validateCronSecret(
 
   const authHeader = req.headers.authorization
 
-  if (typeof authHeader !== 'string' || authHeader !== `Bearer ${process.env.CRON_SECRET ?? ''}`) {
+  if (typeof authHeader !== 'string' || authHeader !== `Bearer ${env.CRON_SECRET ?? ''}`) {
     sendUnauthorized(res, 'Invalid cron secret')
     return false
   }
@@ -44,7 +45,7 @@ export function validateLumaWebhook(
   // Luma sends a signature header for webhook verification
   // For now, we'll use a simple secret comparison
   // In production, implement proper HMAC verification
-  const webhookSecret = process.env.LUMA_WEBHOOK_SECRET
+  const webhookSecret = env.LUMA_WEBHOOK_SECRET
 
   if (typeof signature !== 'string' || signature !== webhookSecret) {
     sendUnauthorized(res, 'Invalid webhook signature')

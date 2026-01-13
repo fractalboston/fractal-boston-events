@@ -1,10 +1,11 @@
 import { Resend } from 'resend'
-import type { LumaEvent } from './luma'
+import type { LumaEvent } from '@/lib/luma'
+import { env } from '@/lib/env'
 
 let resendClient: Resend | null = null
 
 function getResend(): Resend {
-  resendClient ??= new Resend(process.env.RESEND_API_KEY)
+  resendClient ??= new Resend(env.RESEND_API_KEY)
   return resendClient
 }
 
@@ -58,9 +59,19 @@ function wrapInEmailTemplate(content: string, unsubscribeUrl: string): string {
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a1a;">
         ${content}
         <hr style="margin-top: 32px; border: none; border-top: 1px solid #e5e5e5;">
-        <p style="font-size: 12px; color: #999; margin-top: 16px;">
-          <a href="${unsubscribeUrl}" style="color: #999;">Unsubscribe</a> from these emails.
-        </p>
+        <div style="margin-top: 16px; padding: 16px; background-color: #f9fafb; border-radius: 8px;">
+          <p style="font-size: 14px; color: #666; margin: 0 0 12px 0; font-weight: 600;">
+            Fractal Boston
+          </p>
+          <p style="font-size: 12px; color: #999; margin: 0 0 8px 0;">
+            <a href="https://fractal.boston" style="color: #2563eb; text-decoration: none;">fractal.boston</a>
+            • <a href="https://lu.ma/fractalboston" style="color: #2563eb; text-decoration: none;">Calendar</a>
+            • <a href="https://discord.gg/fractalboston" style="color: #2563eb; text-decoration: none;">Discord</a>
+          </p>
+          <p style="font-size: 12px; color: #999; margin: 0;">
+            <a href="${unsubscribeUrl}" style="color: #999; text-decoration: none;">Unsubscribe</a> from these emails.
+          </p>
+        </div>
       </body>
     </html>
   `
@@ -176,10 +187,12 @@ export async function sendBatchEmails(
   events: LumaEvent[],
   appUrl: string,
   type: 'weekly' | 'new-event',
-  singleEvent?: LumaEvent
-): Promise<{ success: number; failed: number }> {
+  singleEvent?: LumaEvent,
+  discordWebhookUrl?: string
+): Promise<{ success: number; failed: number; errors: Error[] }> {
   let success = 0
   let failed = 0
+  const errors: Error[] = []
 
   // Resend has a batch API, but for simplicity we'll send individually
   // with a small delay to avoid rate limits (100/sec on free tier)
@@ -194,10 +207,22 @@ export async function sendBatchEmails(
       // Small delay to stay within rate limits
       await new Promise((resolve) => setTimeout(resolve, 50))
     } catch (error) {
-      console.error(`Failed to send email to ${email}:`, error)
+      const err = error instanceof Error ? error : new Error(String(error))
+      console.error(`Failed to send email to ${email}:`, err)
+      errors.push(err)
       failed++
+
+      // Log to Discord if webhook URL is provided
+      if (discordWebhookUrl !== undefined) {
+        try {
+          const { sendDiscordError } = await import('./discord')
+          await sendDiscordError(discordWebhookUrl, err, `Failed to send email to ${email}`)
+        } catch (discordError) {
+          console.error('Failed to log error to Discord:', discordError)
+        }
+      }
     }
   }
 
-  return { success, failed }
+  return { success, failed, errors }
 }

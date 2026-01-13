@@ -4,8 +4,13 @@ import { sendSuccess, sendMethodNotAllowed, sendInternalError } from '@/lib/api-
 import type { ApiResponse, ApiErrorResponse } from '@/lib/api-response'
 import { getAllVerifiedSubscribers } from '@/lib/subscribers'
 import { sendBatchEmails } from '@/lib/email'
-import { sendDiscordWeeklySummary } from '@/lib/discord'
+import {
+  sendDiscordWeeklySummary,
+  sendDiscordEmailJobStats,
+  sendDiscordError,
+} from '@/lib/discord'
 import { fetchUpcomingEvents } from '@/lib/luma'
+import { env } from '@/lib/env'
 
 type CronResponse = {
   message: string
@@ -28,34 +33,54 @@ export default async function handler(
   }
 
   try {
-    const lumaApiKey = process.env.LUMA_API_KEY
-    const lumaCalendarId = process.env.LUMA_CALENDAR_ID
-    const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL
-    const discordModRoleId = process.env.DISCORD_MOD_ROLE_ID
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
-
-    if (lumaApiKey === undefined || lumaCalendarId === undefined) {
-      sendInternalError(res, 'Missing Luma API configuration')
-      return
-    }
+    const {
+      LUMA_API_KEY,
+      LUMA_CALENDAR_ID,
+      DISCORD_EVENTS_WEBHOOK_URL,
+      DISCORD_LOGGING_WEBHOOK_URL,
+      DISCORD_MOD_ROLE_ID,
+      APP_URL,
+    } = env
 
     // Fetch upcoming events
-    const events = await fetchUpcomingEvents(lumaApiKey, lumaCalendarId)
+    const events = await fetchUpcomingEvents(LUMA_API_KEY, LUMA_CALENDAR_ID)
 
-    // Post to Discord
-    if (discordWebhookUrl !== undefined) {
-      try {
-        await sendDiscordWeeklySummary(discordWebhookUrl, events, discordModRoleId)
-      } catch (discordError) {
-        console.error('Failed to post to Discord:', discordError)
-      }
+    // Post event summary to Discord
+    try {
+      await sendDiscordWeeklySummary(DISCORD_EVENTS_WEBHOOK_URL, events, DISCORD_MOD_ROLE_ID)
+    } catch (discordError) {
+      console.error('Failed to post to Discord:', discordError)
     }
 
     // Get all verified subscribers
     const subscribers = await getAllVerifiedSubscribers()
 
     // Send weekly digest to all subscribers
-    const { success, failed } = await sendBatchEmails(subscribers, events, appUrl, 'weekly')
+    const { success, failed } = await sendBatchEmails(
+      subscribers,
+      events,
+      APP_URL,
+      'weekly',
+      undefined,
+      DISCORD_LOGGING_WEBHOOK_URL
+    )
+
+    // Send job stats to Discord logging channel
+    try {
+      // Resend free tier: 3000 emails/month, 100/day
+      // Estimate monthly usage: 4 weeks * subscribers
+      const estimatedMonthlyUsage = subscribers.length * 4
+      await sendDiscordEmailJobStats(DISCORD_LOGGING_WEBHOOK_URL, {
+        emailsSent: success,
+        emailsFailed: failed,
+        eventsCount: events.length,
+        subscribersCount: subscribers.length,
+        resendMonthlyLimit: 3000,
+        resendMonthlyUsed: estimatedMonthlyUsage,
+      })
+    } catch (discordError) {
+      console.error('Failed to send stats to Discord:', discordError)
+    }
 
     sendSuccess(res, {
       message: 'Weekly digest sent',
@@ -65,6 +90,18 @@ export default async function handler(
     })
   } catch (error) {
     console.error('Weekly cron error:', error)
+
+    // Log error to Discord logging channel
+    try {
+      await sendDiscordError(
+        env.DISCORD_LOGGING_WEBHOOK_URL,
+        error instanceof Error ? error : new Error(String(error)),
+        'Weekly cron job error'
+      )
+    } catch (discordError) {
+      console.error('Failed to log error to Discord:', discordError)
+    }
+
     sendInternalError(res, 'Failed to run weekly digest')
   }
 }
