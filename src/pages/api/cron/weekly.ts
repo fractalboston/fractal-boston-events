@@ -33,14 +33,21 @@ export default async function handler(
   }
 
   try {
-    const { LUMA_API_KEY, LUMA_CALENDAR_ID, DISCORD_WEBHOOK_URL, DISCORD_MOD_ROLE_ID, APP_URL } = env
+    const {
+      LUMA_API_KEY,
+      LUMA_CALENDAR_ID,
+      DISCORD_EVENTS_WEBHOOK_URL,
+      DISCORD_LOGGING_WEBHOOK_URL,
+      DISCORD_MOD_ROLE_ID,
+      APP_URL,
+    } = env
 
     // Fetch upcoming events
     const events = await fetchUpcomingEvents(LUMA_API_KEY, LUMA_CALENDAR_ID)
 
-    // Post to Discord
+    // Post event summary to Discord
     try {
-      await sendDiscordWeeklySummary(DISCORD_WEBHOOK_URL, events, DISCORD_MOD_ROLE_ID)
+      await sendDiscordWeeklySummary(DISCORD_EVENTS_WEBHOOK_URL, events, DISCORD_MOD_ROLE_ID)
     } catch (discordError) {
       console.error('Failed to post to Discord:', discordError)
     }
@@ -55,15 +62,15 @@ export default async function handler(
       APP_URL,
       'weekly',
       undefined,
-      DISCORD_WEBHOOK_URL
+      DISCORD_LOGGING_WEBHOOK_URL
     )
 
-    // Send job stats to Discord
+    // Send job stats to Discord logging channel
     try {
       // Resend free tier: 3000 emails/month, 100/day
       // Estimate monthly usage: 4 weeks * subscribers
       const estimatedMonthlyUsage = subscribers.length * 4
-      await sendDiscordEmailJobStats(DISCORD_WEBHOOK_URL, {
+      await sendDiscordEmailJobStats(DISCORD_LOGGING_WEBHOOK_URL, {
         emailsSent: success,
         emailsFailed: failed,
         eventsCount: events.length,
@@ -84,10 +91,10 @@ export default async function handler(
   } catch (error) {
     console.error('Weekly cron error:', error)
 
-    // Log error to Discord
+    // Log error to Discord logging channel
     try {
       await sendDiscordError(
-        env.DISCORD_WEBHOOK_URL,
+        env.DISCORD_LOGGING_WEBHOOK_URL,
         error instanceof Error ? error : new Error(String(error)),
         'Weekly cron job error'
       )

@@ -11,6 +11,7 @@ import { getAllVerifiedSubscribers } from '@/lib/subscribers'
 import { sendBatchEmails } from '@/lib/email'
 import { sendDiscordNewEventAlert, sendDiscordError } from '@/lib/discord'
 import { parseLumaEventCreatedWebhook, isEventWithinNextWeek } from '@/lib/luma'
+import { env } from '@/lib/env'
 import { ZodError } from 'zod'
 
 type WebhookResponse = {
@@ -41,27 +42,23 @@ export default async function handler(
       return
     }
 
-    // Post to Discord
-    const discordWebhookUrl = env.DISCORD_WEBHOOK_URL
-    if (discordWebhookUrl !== undefined) {
-      try {
-        await sendDiscordNewEventAlert(discordWebhookUrl, event)
-      } catch (discordError) {
-        console.error('Failed to post to Discord:', discordError)
-      }
+    // Post new event alert to Discord events channel
+    try {
+      await sendDiscordNewEventAlert(env.DISCORD_EVENTS_WEBHOOK_URL, event)
+    } catch (discordError) {
+      console.error('Failed to post to Discord:', discordError)
     }
 
     // Email all verified subscribers
     const subscribers = await getAllVerifiedSubscribers()
-    const appUrl = env.APP_URL
 
     const { success } = await sendBatchEmails(
       subscribers,
       [],
-      appUrl,
+      env.APP_URL,
       'new-event',
       event,
-      discordWebhookUrl
+      env.DISCORD_LOGGING_WEBHOOK_URL
     )
 
     sendSuccess(res, {
@@ -75,18 +72,15 @@ export default async function handler(
     }
     console.error('Luma event webhook error:', error)
 
-    // Log error to Discord
-    const discordWebhookUrl = env.DISCORD_WEBHOOK_URL
-    if (discordWebhookUrl !== undefined) {
-      try {
-        await sendDiscordError(
-          discordWebhookUrl,
-          error instanceof Error ? error : new Error(String(error)),
-          'Luma event webhook error'
-        )
-      } catch (discordError) {
-        console.error('Failed to log error to Discord:', discordError)
-      }
+    // Log error to Discord logging channel
+    try {
+      await sendDiscordError(
+        env.DISCORD_LOGGING_WEBHOOK_URL,
+        error instanceof Error ? error : new Error(String(error)),
+        'Luma event webhook error'
+      )
+    } catch (discordError) {
+      console.error('Failed to log error to Discord:', discordError)
     }
 
     sendInternalError(res, 'Failed to process webhook')

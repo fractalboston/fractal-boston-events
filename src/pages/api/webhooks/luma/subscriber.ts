@@ -11,6 +11,7 @@ import { createSubscriber, getSubscriberByEmail } from '@/lib/subscribers'
 import { sendWelcomeEmail } from '@/lib/email'
 import { fetchUpcomingEvents, parseLumaSubscriberWebhook } from '@/lib/luma'
 import { sendDiscordError } from '@/lib/discord'
+import { env } from '@/lib/env'
 import { ZodError } from 'zod'
 
 type WebhookResponse = {
@@ -50,17 +51,11 @@ export default async function handler(
     })
 
     // Send welcome email with upcoming events
-    const appUrl = env.APP_URL
-    const lumaApiKey = env.LUMA_API_KEY
-    const lumaCalendarId = env.LUMA_CALENDAR_ID
-
-    if (lumaApiKey !== undefined && lumaCalendarId !== undefined) {
-      try {
-        const events = await fetchUpcomingEvents(lumaApiKey, lumaCalendarId)
-        await sendWelcomeEmail(subscriber.email, subscriber.token, events, appUrl)
-      } catch (emailError) {
-        console.error('Failed to send welcome email:', emailError)
-      }
+    try {
+      const events = await fetchUpcomingEvents(env.LUMA_API_KEY, env.LUMA_CALENDAR_ID)
+      await sendWelcomeEmail(subscriber.email, subscriber.token, events, env.APP_URL)
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError)
     }
 
     sendSuccess(res, { message: 'Subscriber added from Luma' })
@@ -71,18 +66,15 @@ export default async function handler(
     }
     console.error('Luma subscriber webhook error:', error)
 
-    // Log error to Discord
-    const discordWebhookUrl = env.DISCORD_WEBHOOK_URL
-    if (discordWebhookUrl !== undefined) {
-      try {
-        await sendDiscordError(
-          discordWebhookUrl,
-          error instanceof Error ? error : new Error(String(error)),
-          'Luma subscriber webhook error'
-        )
-      } catch (discordError) {
-        console.error('Failed to log error to Discord:', discordError)
-      }
+    // Log error to Discord logging channel
+    try {
+      await sendDiscordError(
+        env.DISCORD_LOGGING_WEBHOOK_URL,
+        error instanceof Error ? error : new Error(String(error)),
+        'Luma subscriber webhook error'
+      )
+    } catch (discordError) {
+      console.error('Failed to log error to Discord:', discordError)
     }
 
     sendInternalError(res, 'Failed to process webhook')

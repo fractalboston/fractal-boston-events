@@ -121,18 +121,24 @@ Vercel cron uses UTC, so 8am EST = 13:00 UTC (accounting for EST = UTC-5).
 
 ## Environment Variables
 
-| Variable              | Required | Description                               |
-| --------------------- | -------- | ----------------------------------------- |
-| `LUMA_API_KEY`        | Yes      | Luma API key for fetching events          |
-| `LUMA_CALENDAR_ID`    | Yes      | Calendar ID (from lu.ma URL)              |
-| `LUMA_WEBHOOK_SECRET` | Yes      | Secret for validating webhooks            |
-| `RESEND_API_KEY`      | Yes      | Resend API key                            |
-| `DISCORD_WEBHOOK_URL` | Yes      | Discord channel webhook                   |
-| `DISCORD_MOD_ROLE_ID` | Yes      | Role ID to ping when no events            |
-| `DATABASE_URL`        | Yes      | Postgres connection string                |
-| `SUBSCRIBE_API_KEY`   | Yes      | API key for subscribe endpoint            |
-| `APP_URL`             | Yes      | Base URL for email links (fractal.boston) |
-| `CRON_SECRET`         | No       | Auto-set by Vercel for cron auth          |
+See `.env.example` for detailed documentation on all environment variables, including:
+- Where to obtain each value
+- Format requirements
+- Usage context
+
+### Key Variables
+
+| Variable                       | Required | Purpose                                    |
+| ------------------------------ | -------- | ------------------------------------------ |
+| `DISCORD_EVENTS_WEBHOOK_URL`   | Yes      | Discord webhook for event notifications    |
+| `DISCORD_LOGGING_WEBHOOK_URL`  | Yes      | Discord webhook for errors & metrics       |
+| `LUMA_API_KEY`                 | Yes      | Luma API access                            |
+| `RESEND_API_KEY`               | Yes      | Email service                              |
+| `DATABASE_URL`                 | Yes      | Postgres connection                        |
+| `SUBSCRIBE_API_KEY`            | Yes      | API security                               |
+| `APP_URL`                      | Yes      | Base URL for email links                   |
+
+**Note**: The two Discord webhooks can point to the same channel or different channels depending on your notification preferences.
 
 ## Luma Webhook Setup
 
@@ -158,24 +164,28 @@ Both webhooks need the `X-Luma-Signature` header set to your `LUMA_WEBHOOK_SECRE
 ## Discord Webhook Setup
 
 1. Go to Discord channel settings → Integrations → Webhooks
-2. Create webhook, copy URL
-3. Set as `DISCORD_WEBHOOK_URL`
-4. Get mod role ID (enable Developer Mode, right-click role)
-5. Set as `DISCORD_MOD_ROLE_ID`
+2. Create webhooks for events and logging (can be same or different channels):
+   - **Events webhook**: Set as `DISCORD_EVENTS_WEBHOOK_URL`
+   - **Logging webhook**: Set as `DISCORD_LOGGING_WEBHOOK_URL`
+3. Get mod role ID (enable Developer Mode, right-click role)
+4. Set as `DISCORD_MOD_ROLE_ID`
 
-### Discord Logging Features
+### Discord Integration Features
 
-The system automatically logs to Discord:
+**Events Channel** (`DISCORD_EVENTS_WEBHOOK_URL`):
+- Weekly event summaries every Saturday
+- New event alerts when events are added <7 days out
+- Mod role pings when no events are scheduled
 
-- **Error Logging**: All errors from API endpoints are logged to Discord with stack traces
-- **Weekly Email Job Stats**: After sending weekly emails, logs stats including:
-  - Number of emails sent/failed
-  - Number of events included
+**Logging Channel** (`DISCORD_LOGGING_WEBHOOK_URL`):
+- Error logging from all API endpoints with stack traces
+- Email job statistics after weekly digest:
+  - Emails sent/failed count
+  - Events included
   - Total subscriber count
   - Resend monthly usage estimate
-  - **Warning**: Alerts when approaching Resend monthly limit (75% threshold)
-- **Weekly Event Summary**: Posts upcoming events every Saturday (or alerts mods if no events)
-- **New Event Alerts**: Posts when new events are added <7 days out
+  - **Warning** alerts when approaching 75% of Resend monthly limit
+- Individual email failure notifications
 
 ## Development
 

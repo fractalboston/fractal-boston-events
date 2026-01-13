@@ -102,7 +102,7 @@ export default async function handler(
     // Log error to Discord
     try {
       await sendDiscordError(
-        env.DISCORD_WEBHOOK_URL,
+        env.DISCORD_LOGGING_WEBHOOK_URL,
         error instanceof Error ? error : new Error(String(error)),
         'Subscribe endpoint error'
       )
