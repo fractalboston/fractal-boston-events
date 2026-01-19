@@ -1,56 +1,51 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { sendUnauthorized } from '@/lib/api-response'
-import type { ApiErrorResponse } from '@/lib/api-response'
-import { env } from '@/lib/env'
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+import { sendUnauthorized } from "@/lib/api-response";
+import type { ApiErrorResponse } from "@/lib/api-response";
+import { env } from "@/lib/env";
 
-export function validateApiKey(
-  req: NextApiRequest,
-  res: NextApiResponse<ApiErrorResponse>
-): boolean {
-  const apiKey = req.headers['x-api-key']
+export async function validateApiKey(): Promise<NextResponse<ApiErrorResponse> | null> {
+  const headersList = await headers();
+  const apiKey = headersList.get("x-api-key");
 
-  if (typeof apiKey !== 'string' || apiKey !== env.SUBSCRIBE_API_KEY) {
-    sendUnauthorized(res, 'Invalid or missing API key')
-    return false
+  if (typeof apiKey !== "string" || apiKey !== env.SUBSCRIBE_API_KEY) {
+    return sendUnauthorized("Invalid or missing API key");
   }
 
-  return true
+  return null;
 }
 
-export function validateCronSecret(
-  req: NextApiRequest,
-  res: NextApiResponse<ApiErrorResponse>
-): boolean {
+export async function validateCronSecret(): Promise<NextResponse<ApiErrorResponse> | null> {
   // In development, allow without secret
-  if (process.env.NODE_ENV === 'development') {
-    return true
+  if (process.env.NODE_ENV === "development") {
+    return null;
   }
 
-  const authHeader = req.headers.authorization
+  const headersList = await headers();
+  const authHeader = headersList.get("authorization");
 
-  if (typeof authHeader !== 'string' || authHeader !== `Bearer ${env.CRON_SECRET ?? ''}`) {
-    sendUnauthorized(res, 'Invalid cron secret')
-    return false
+  if (
+    typeof authHeader !== "string" ||
+    authHeader !== `Bearer ${env.CRON_SECRET ?? ""}`
+  ) {
+    return sendUnauthorized("Invalid cron secret");
   }
 
-  return true
+  return null;
 }
 
-export function validateLumaWebhook(
-  req: NextApiRequest,
-  res: NextApiResponse<ApiErrorResponse>
-): boolean {
-  const signature = req.headers['x-luma-signature']
+export async function validateLumaWebhook(): Promise<NextResponse<ApiErrorResponse> | null> {
+  const headersList = await headers();
+  const signature = headersList.get("x-luma-signature");
 
   // Luma sends a signature header for webhook verification
   // For now, we'll use a simple secret comparison
   // In production, implement proper HMAC verification
-  const webhookSecret = env.LUMA_WEBHOOK_SECRET
+  const webhookSecret = env.LUMA_WEBHOOK_SECRET;
 
-  if (typeof signature !== 'string' || signature !== webhookSecret) {
-    sendUnauthorized(res, 'Invalid webhook signature')
-    return false
+  if (typeof signature !== "string" || signature !== webhookSecret) {
+    return sendUnauthorized("Invalid webhook signature");
   }
 
-  return true
+  return null;
 }

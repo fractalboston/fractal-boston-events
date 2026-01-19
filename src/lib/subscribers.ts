@@ -1,21 +1,23 @@
-import { db } from '@/db'
-import type { SubscribersTable, SubscriberStatus } from '@/db'
-import { v4 as uuidv4 } from 'uuid'
+import { v4 as uuidv4 } from "uuid";
+import { db } from "@/db";
+import type { SubscriberStatus, SubscribersTable } from "@/db";
 
-export type Subscriber = SubscribersTable
+export type Subscriber = SubscribersTable;
 
 export type CreateSubscriberInput = {
-  email: string
-  source: 'form' | 'luma'
-  status?: SubscriberStatus
-}
+  email: string;
+  source: "form" | "luma";
+  status?: SubscriberStatus;
+};
 
-export async function createSubscriber(input: CreateSubscriberInput): Promise<Subscriber> {
-  const token = uuidv4()
-  const status = input.status ?? 'pending'
+export async function createSubscriber(
+  input: CreateSubscriberInput
+): Promise<Subscriber> {
+  const token = uuidv4();
+  const status = input.status ?? "pending";
 
   const result = await db
-    .insertInto('subscribers')
+    .insertInto("subscribers")
     .values({
       id: uuidv4(),
       email: input.email.toLowerCase(),
@@ -26,73 +28,89 @@ export async function createSubscriber(input: CreateSubscriberInput): Promise<Su
       updated_at: new Date(),
     })
     .returningAll()
-    .executeTakeFirstOrThrow()
+    .executeTakeFirstOrThrow();
 
-  return result
+  return result;
 }
 
-export async function getSubscriberByEmail(email: string): Promise<Subscriber | undefined> {
+export async function getSubscriberByEmail(
+  email: string
+): Promise<Subscriber | undefined> {
   return db
-    .selectFrom('subscribers')
+    .selectFrom("subscribers")
     .selectAll()
-    .where('email', '=', email.toLowerCase())
-    .executeTakeFirst()
+    .where("email", "=", email.toLowerCase())
+    .executeTakeFirst();
 }
 
-export async function getSubscriberByToken(token: string): Promise<Subscriber | undefined> {
-  return db.selectFrom('subscribers').selectAll().where('token', '=', token).executeTakeFirst()
+export async function getSubscriberByToken(
+  token: string
+): Promise<Subscriber | undefined> {
+  return db
+    .selectFrom("subscribers")
+    .selectAll()
+    .where("token", "=", token)
+    .executeTakeFirst();
 }
 
-export async function verifySubscriber(token: string): Promise<Subscriber | undefined> {
+export async function verifySubscriber(
+  token: string
+): Promise<Subscriber | undefined> {
   const result = await db
-    .updateTable('subscribers')
+    .updateTable("subscribers")
     .set({
-      status: 'verified',
+      status: "verified",
       updated_at: new Date(),
     })
-    .where('token', '=', token)
-    .where('status', '=', 'pending')
+    .where("token", "=", token)
+    .where("status", "=", "pending")
     .returningAll()
-    .executeTakeFirst()
+    .executeTakeFirst();
 
-  return result
+  return result;
 }
 
-export async function unsubscribe(token: string): Promise<Subscriber | undefined> {
+export async function unsubscribe(
+  token: string
+): Promise<Subscriber | undefined> {
   const result = await db
-    .updateTable('subscribers')
+    .updateTable("subscribers")
     .set({
-      status: 'unsubscribed',
+      status: "unsubscribed",
       updated_at: new Date(),
     })
-    .where('token', '=', token)
+    .where("token", "=", token)
     .returningAll()
-    .executeTakeFirst()
+    .executeTakeFirst();
 
-  return result
+  return result;
 }
 
-export async function getAllVerifiedSubscribers(): Promise<{ email: string; token: string }[]> {
+export async function getAllVerifiedSubscribers(): Promise<
+  { email: string; token: string }[]
+> {
   const results = await db
-    .selectFrom('subscribers')
-    .select(['email', 'token'])
-    .where('status', '=', 'verified')
-    .execute()
+    .selectFrom("subscribers")
+    .select(["email", "token"])
+    .where("status", "=", "verified")
+    .execute();
 
-  return results
+  return results;
 }
 
-export async function resubscribe(email: string): Promise<Subscriber | undefined> {
+export async function resubscribe(
+  email: string
+): Promise<Subscriber | undefined> {
   const result = await db
-    .updateTable('subscribers')
+    .updateTable("subscribers")
     .set({
-      status: 'verified',
+      status: "verified",
       updated_at: new Date(),
     })
-    .where('email', '=', email.toLowerCase())
-    .where('status', '=', 'unsubscribed')
+    .where("email", "=", email.toLowerCase())
+    .where("status", "=", "unsubscribed")
     .returningAll()
-    .executeTakeFirst()
+    .executeTakeFirst();
 
-  return result
+  return result;
 }

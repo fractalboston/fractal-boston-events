@@ -1,49 +1,54 @@
-import type { NextApiResponse } from 'next'
+import { NextResponse } from "next/server";
 
 export type ApiSuccessResponse<T> = {
-  success: true
-  data: T
-}
+  success: true;
+  data: T;
+};
 
 export type ApiErrorResponse = {
-  success: false
-  error: string
+  success: false;
+  error: string;
+};
+
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+export function sendSuccess<T>(data: T): NextResponse<ApiResponse<T>> {
+  return NextResponse.json({ success: true, data }, { status: 200 });
 }
 
-export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse
-
-export function sendSuccess<T>(res: NextApiResponse<ApiResponse<T>>, data: T): void {
-  res.status(200).json({ success: true, data })
-}
-
-export function sendCreated<T>(res: NextApiResponse<ApiResponse<T>>, data: T): void {
-  res.status(201).json({ success: true, data })
+export function sendCreated<T>(data: T): NextResponse<ApiResponse<T>> {
+  return NextResponse.json({ success: true, data }, { status: 201 });
 }
 
 export function sendError(
-  res: NextApiResponse<ApiErrorResponse>,
   status: number,
   message: string
-): void {
-  res.status(status).json({ success: false, error: message })
+): NextResponse<ApiErrorResponse> {
+  return NextResponse.json({ success: false, error: message }, { status });
 }
 
-export function sendBadRequest(res: NextApiResponse<ApiErrorResponse>, message: string): void {
-  sendError(res, 400, message)
+export function sendBadRequest(
+  message: string
+): NextResponse<ApiErrorResponse> {
+  return sendError(400, message);
 }
 
-export function sendUnauthorized(res: NextApiResponse<ApiErrorResponse>, message: string): void {
-  sendError(res, 401, message)
+export function sendUnauthorized(
+  message: string
+): NextResponse<ApiErrorResponse> {
+  return sendError(401, message);
 }
 
-export function sendNotFound(res: NextApiResponse<ApiErrorResponse>, message: string): void {
-  sendError(res, 404, message)
+export function sendNotFound(message: string): NextResponse<ApiErrorResponse> {
+  return sendError(404, message);
 }
 
-export function sendMethodNotAllowed(res: NextApiResponse<ApiErrorResponse>): void {
-  sendError(res, 405, 'Method not allowed')
+export function sendMethodNotAllowed(): NextResponse<ApiErrorResponse> {
+  return sendError(405, "Method not allowed");
 }
 
-export function sendInternalError(res: NextApiResponse<ApiErrorResponse>, message: string): void {
-  sendError(res, 500, message)
+export function sendInternalError(
+  message: string
+): NextResponse<ApiErrorResponse> {
+  return sendError(500, message);
 }

@@ -6,10 +6,10 @@
     }
   ],
   "functions": {
-    "src/pages/api/cron/weekly.ts": {
+    "src/app/api/cron/weekly/route.ts": {
       "maxDuration": 300
     },
-    "src/pages/api/webhooks/luma/event.ts": {
+    "src/app/api/webhooks/luma/event/route.ts": {
       "maxDuration": 300
     }
   }
