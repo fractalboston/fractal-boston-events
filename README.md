@@ -33,7 +33,7 @@ yarn dev
 
 ## Setup
 
-See [clause.md](./clause.md) for detailed setup instructions including:
+See [claude.md](./claude.md) for detailed setup instructions including:
 
 - Supabase database setup
 - Resend domain verification

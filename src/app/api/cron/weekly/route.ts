@@ -25,7 +25,6 @@ export async function GET(): Promise<Response> {
 
   try {
     const {
-      LUMA_API_KEY,
       LUMA_CALENDAR_ID,
       DISCORD_EVENTS_WEBHOOK_URL,
       DISCORD_LOGGING_WEBHOOK_URL,
@@ -33,7 +32,7 @@ export async function GET(): Promise<Response> {
       APP_URL,
     } = env;
 
-    const events = await fetchUpcomingEvents(LUMA_API_KEY, LUMA_CALENDAR_ID);
+    const events = await fetchUpcomingEvents(LUMA_CALENDAR_ID);
 
     try {
       await sendDiscordWeeklySummary(
@@ -45,30 +44,33 @@ export async function GET(): Promise<Response> {
       console.error("Failed to post to Discord:", discordError);
     }
 
-    const subscribers = await getAllVerifiedSubscribers();
+    // const subscribers = await getAllVerifiedSubscribers();
 
-    const { success, failed } = await sendBatchEmails(
-      subscribers,
-      events,
-      APP_URL,
-      "weekly",
-      undefined,
-      DISCORD_LOGGING_WEBHOOK_URL
-    );
+    // const { success, failed } = await sendBatchEmails(
+    //   subscribers,
+    //   events,
+    //   APP_URL,
+    //   "weekly",
+    //   undefined,
+    //   DISCORD_LOGGING_WEBHOOK_URL
+    // );
 
-    try {
-      const estimatedMonthlyUsage = subscribers.length * 4;
-      await sendDiscordEmailJobStats(DISCORD_LOGGING_WEBHOOK_URL, {
-        emailsSent: success,
-        emailsFailed: failed,
-        eventsCount: events.length,
-        subscribersCount: subscribers.length,
-        resendMonthlyLimit: 3000,
-        resendMonthlyUsed: estimatedMonthlyUsage,
-      });
-    } catch (discordError) {
-      console.error("Failed to send stats to Discord:", discordError);
-    }
+    // try {
+    //   const estimatedMonthlyUsage = subscribers.length * 4;
+    //   await sendDiscordEmailJobStats(DISCORD_LOGGING_WEBHOOK_URL, {
+    //     emailsSent: success,
+    //     emailsFailed: failed,
+    //     eventsCount: events.length,
+    //     subscribersCount: subscribers.length,
+    //     resendMonthlyLimit: 3000,
+    //     resendMonthlyUsed: estimatedMonthlyUsage,
+    //   });
+    // } catch (discordError) {
+    //   console.error("Failed to send stats to Discord:", discordError);
+    // }
+
+    const success = 0;
+    const failed = 0;
 
     return sendSuccess<CronResponse>({
       message: "Weekly digest sent",
