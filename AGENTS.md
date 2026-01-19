@@ -13,7 +13,6 @@ alwaysApply: true
 - `yarn format` - Format code with Prettier (run after changes)
 - `yarn test` - Run tests with Vitest
 - `yarn lint` - Run ESLint
-- `yarn kill-dev` - Kill processes on port 3002
 
 **Never use `npm` or `npx`. Always use `yarn`.**
 

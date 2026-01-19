@@ -62,7 +62,6 @@ export async function POST(request: Request): Promise<Response> {
 
     try {
       const events = await fetchUpcomingEvents(
-        env.LUMA_API_KEY,
         env.LUMA_CALENDAR_ID
       );
       await sendWelcomeEmail(
