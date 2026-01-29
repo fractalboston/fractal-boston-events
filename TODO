@@ -4,3 +4,4 @@
 - [x] vercel login and figure out deployment
 - [x] set up the database
 - [x] yarn migrate successfully
+- [x] have test email include events. make them be fairly plain -- just text and links. it must look like a person made it, not a stylish html template

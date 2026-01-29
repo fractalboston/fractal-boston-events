@@ -14,7 +14,8 @@
     "test": "vitest run",
     "check": "yarn format:check && yarn test && yarn lint && yarn check:types",
     "migrate": "tsx src/db/migrate.ts",
-    "db:test": "tsx scripts/test-db-connection.ts"
+    "db:test": "tsx scripts/test-db-connection.ts",
+    "email:test": "tsx scripts/send-test-email.ts"
   },
   "dependencies": {
     "env-var": "^7.5.0",

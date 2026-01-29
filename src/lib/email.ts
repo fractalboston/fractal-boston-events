@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { env } from "@/lib/env";
+import { getReportableEvents } from "@/lib/luma";
 import type { LumaEvent } from "@/lib/luma";
 
 let resendClient: Resend | null = null;
@@ -19,6 +20,21 @@ function formatEventDate(dateString: string): string {
     minute: "2-digit",
     timeZone: "America/New_York",
   });
+}
+
+function formatEventsPlainText(events: LumaEvent[]): string {
+  if (events.length === 0) {
+    return "<p>No events scheduled for this week.</p>";
+  }
+
+  const eventItems = events
+    .map(
+      (event) =>
+        `<p>${event.event.name}<br>${formatEventDate(event.start_at)}<br><a href="${event.event.url}">${event.event.url}</a></p>`
+    )
+    .join("");
+
+  return eventItems;
 }
 
 function generateEventsHtml(events: LumaEvent[]): string {
@@ -229,4 +245,23 @@ export async function sendBatchEmails(
   }
 
   return { success, failed, errors };
+}
+
+export async function sendTestEmail(email: string): Promise<void> {
+  const events = await getReportableEvents(env.LUMA_CALENDAR_ID);
+  const eventsText = formatEventsPlainText(events);
+
+  const resend = getResend();
+  await resend.emails.send({
+    from: "Fractal Events <events@fractal.boston>",
+    to: email,
+    subject: "Test Email from Fractal Events",
+    html: `
+      <p>Hey,</p>
+      <p>This is a test email from the Fractal Events notification system.</p>
+      <p>Here are the upcoming events:</p>
+      ${eventsText}
+      <p>If you received this email, the email system is working correctly!</p>
+    `,
+  });
 }

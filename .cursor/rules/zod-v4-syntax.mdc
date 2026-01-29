@@ -1,0 +1,140 @@
+---
+description: Zod v4 syntax requirements for schema definitions
+globs: **/*.ts
+alwaysApply: false
+---
+
+# Zod v4 Syntax Requirements
+
+This project uses **Zod version 4**. All schema definitions must use Zod v4 syntax.
+
+## Key Syntax Rules
+
+### Email Validation
+
+**Always use `z.email()` for email validation** - this is the Zod v4 preferred syntax:
+
+```typescript
+// ✅ GOOD - Zod v4 preferred syntax (top-level)
+const schema = z.object({
+  email: z.email(),
+});
+
+// ❌ BAD - z.string().email() is deprecated in v4
+const schema = z.object({
+  email: z.string().email(),
+});
+```
+
+### String Format Validators
+
+In Zod v4, string format validators are **top-level functions**, not methods on `z.string()`:
+
+```typescript
+// ✅ GOOD - Zod v4 syntax (top-level functions)
+z.email()
+z.uuid()
+z.url()
+z.httpUrl()
+z.hostname()
+z.emoji()
+z.base64()
+z.base64url()
+z.hex()
+z.jwt()
+z.nanoid()
+z.cuid()
+z.cuid2()
+z.ulid()
+z.ipv4()
+z.ipv6()
+z.mac()
+z.cidrv4()
+z.cidrv6()
+z.hash("sha256")
+z.iso.date()
+z.iso.time()
+z.iso.datetime()
+z.iso.duration()
+
+// ❌ BAD - Method forms are deprecated in v4
+z.string().email()
+z.string().url()
+z.string().uuid()
+```
+
+### String Methods
+
+For string operations (not format validators), chain from `z.string()`:
+
+```typescript
+// ✅ GOOD - String operations
+z.string().min(1)
+z.string().max(255)
+z.string().length(5)
+z.string().regex(/^[a-z]+$/)
+z.string().startsWith("aaa")
+z.string().endsWith("zzz")
+z.string().includes("---")
+z.string().trim()
+z.string().toLowerCase()
+z.string().toUpperCase()
+z.string().nullable()
+z.string().optional()
+```
+
+### Nullable and Optional
+
+Use `.nullable()`, `.optional()`, or `.nullish()` as appropriate:
+
+```typescript
+// ✅ GOOD
+z.string().nullable()      // string | null
+z.string().optional()      // string | undefined
+z.string().nullish()       // string | null | undefined
+z.string().email().optional()  // Chaining works
+```
+
+### UUID Validation
+
+Use `z.uuid()` - the top-level function is preferred:
+
+```typescript
+// ✅ GOOD - Zod v4 preferred syntax
+z.uuid()
+
+// ❌ BAD - Method form is deprecated
+z.string().uuid()
+```
+
+For more permissive UUID-like identifiers, use `z.guid()`:
+
+```typescript
+z.guid()  // Any 8-4-4-4-12 hex pattern (more permissive)
+```
+
+### Type Inference
+
+Always use `z.infer<typeof schema>` for type extraction:
+
+```typescript
+// ✅ GOOD
+const schema = z.object({
+  email: z.email(),
+  name: z.string(),
+});
+type SchemaType = z.infer<typeof schema>;
+```
+
+## Validation Patterns
+
+Always use `.safeParse()` for validation to handle errors gracefully:
+
+```typescript
+// ✅ GOOD
+const parsed = schema.safeParse(data);
+if (!parsed.success) {
+  return handleError(parsed.error);
+}
+const validData = parsed.data;
+```
