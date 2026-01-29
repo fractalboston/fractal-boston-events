@@ -14,6 +14,9 @@ export default function Home(): ReactElement {
       <p>
         <Link href="/events-preview">Events Preview</Link>
       </p>
+      <p>
+        <Link href="/test-email">Test Email</Link>
+      </p>
     </div>
   );
 }
