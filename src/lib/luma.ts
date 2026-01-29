@@ -102,6 +102,10 @@ export async function fetchUpcomingEvents(
  * Gets the set of events that should be reported via email or Discord.
  * This is the single source of truth for determining which events to notify about.
  * Returns events within the next 7 days.
+ *
+ * IMPORTANT: Both Discord weekly summaries and email weekly digests use this function
+ * to ensure they show the same events. The weekly cron job calls this once and passes
+ * the same events array to both Discord and email functions.
  */
 export async function getReportableEvents(
   calendarId: string

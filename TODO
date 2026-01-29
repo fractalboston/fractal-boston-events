@@ -60,12 +60,13 @@
 
 ## Phase 5: Verification & Testing
 
-- [ ] Verify email footer in `src/lib/email.ts` includes all Fractal Boston links (fractal.boston, Calendar, Discord, Unsubscribe)
-- [ ] Verify footer appears in all email types (verification, welcome, weekly digest, new event alert)
-- [ ] Verify Discord and email use same events (both use `getReportableEvents()`)
-- [ ] Test API endpoints from external domain (fractal.boston) - verify CORS works
-- [ ] Test subscribe flow: form → verification email → verify page (on fractal.boston) → welcome email
-- [ ] Test unsubscribe flow: email link → unsubscribe page (on fractal.boston) → confirmation
-- [ ] Test subscriber import scripts (both Luma and Substack)
-- [ ] Test that all Discord logging works correctly
-- [ ] Verify email links point to correct external URLs (fractal.boston/verify?token=xxx, fractal.boston/unsubscribe?token=xxx)
+- [x] Verify email footer in `src/lib/email.ts` includes all Fractal Boston links (fractal.boston, Calendar, Discord, Unsubscribe)
+- [x] Verify footer appears in all email types (verification, welcome, weekly digest, new event alert)
+- [x] Verify Discord and email use same events (both use `getReportableEvents()`)
+- [x] Add documentation comment to `getReportableEvents()` explaining it's the single source of truth
+- [ ] Test API endpoints from external domain (fractal.boston) - verify CORS works (manual testing required)
+- [ ] Test subscribe flow: form → verification email → verify page (on fractal.boston) → welcome email (manual testing required)
+- [ ] Test unsubscribe flow: email link → unsubscribe page (on fractal.boston) → confirmation (manual testing required)
+- [ ] Test subscriber import scripts (both Luma and Substack) - scripts created, need API endpoints (manual testing required)
+- [ ] Test that all Discord logging works correctly (manual testing required)
+- [x] Verify email links point to correct external URLs (fractal.boston/verify?token=xxx, fractal.boston/unsubscribe?token=xxx) - verified in code
