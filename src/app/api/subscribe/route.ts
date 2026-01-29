@@ -7,7 +7,7 @@ import {
   sendSuccess,
 } from "@/lib/api-response";
 import { validateApiKey } from "@/lib/auth";
-import { sendDiscordError } from "@/lib/discord";
+import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendVerificationEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import {
@@ -57,6 +57,11 @@ export async function POST(request: Request): Promise<Response> {
 
     if (existing !== undefined) {
       if (existing.status === "verified") {
+        await sendDiscordInfo(
+          env.DISCORD_LOGGING_WEBHOOK_URL,
+          "Subscription attempt for already verified email",
+          "Subscribe - Already Verified"
+        );
         return sendSuccess<SubscribeResponse>({
           message: "Already subscribed",
           email: existing.email,
@@ -66,6 +71,11 @@ export async function POST(request: Request): Promise<Response> {
       if (existing.status === "unsubscribed") {
         const resubscribed = await resubscribe(email);
         if (resubscribed !== undefined) {
+          await sendDiscordInfo(
+            env.DISCORD_LOGGING_WEBHOOK_URL,
+            "Resubscribed successfully",
+            "Subscribe - Resubscribed"
+          );
           return sendSuccess<SubscribeResponse>({
             message: "Resubscribed successfully",
             email: resubscribed.email,
@@ -75,6 +85,11 @@ export async function POST(request: Request): Promise<Response> {
 
       if (existing.status === "pending") {
         await sendVerificationEmail(email, existing.token, appUrl);
+        await sendDiscordInfo(
+          env.DISCORD_LOGGING_WEBHOOK_URL,
+          "Verification email resent",
+          "Subscribe - Verification Resent"
+        );
         return sendSuccess<SubscribeResponse>({
           message: "Verification email resent",
           email: existing.email,
@@ -89,6 +104,12 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     await sendVerificationEmail(email, subscriber.token, appUrl);
+
+    await sendDiscordInfo(
+      env.DISCORD_LOGGING_WEBHOOK_URL,
+      "New subscription created",
+      "Subscribe - New Subscriber"
+    );
 
     return sendCreated<SubscribeResponse>({
       message: "Verification email sent",

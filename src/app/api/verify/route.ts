@@ -6,7 +6,7 @@ import {
   sendNotFound,
   sendSuccess,
 } from "@/lib/api-response";
-import { sendDiscordError } from "@/lib/discord";
+import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendWelcomeEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
@@ -49,6 +49,11 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     if (existing.status === "verified") {
+      await sendDiscordInfo(
+        env.DISCORD_LOGGING_WEBHOOK_URL,
+        "Verification attempt for already verified email",
+        "Verify - Already Verified"
+      );
       return sendSuccess<VerifyResponse>({
         message: "Already verified",
         email: existing.email,
@@ -64,6 +69,12 @@ export async function POST(request: Request): Promise<Response> {
     if (subscriber === undefined) {
       return sendNotFound("Token not found or already verified");
     }
+
+    await sendDiscordInfo(
+      env.DISCORD_LOGGING_WEBHOOK_URL,
+      "Email verified successfully",
+      "Verify - Success"
+    );
 
     try {
       const events = await getReportableEvents(env.LUMA_CALENDAR_ID);

@@ -6,7 +6,7 @@ import {
   sendNotFound,
   sendSuccess,
 } from "@/lib/api-response";
-import { sendDiscordError } from "@/lib/discord";
+import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { getSubscriberByToken, unsubscribe } from "@/lib/subscribers";
 
@@ -47,6 +47,11 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     if (existing.status === "unsubscribed") {
+      await sendDiscordInfo(
+        env.DISCORD_LOGGING_WEBHOOK_URL,
+        "Unsubscribe attempt for already unsubscribed email",
+        "Unsubscribe - Already Unsubscribed"
+      );
       return sendSuccess<UnsubscribeResponse>({
         message: "Already unsubscribed",
         email: existing.email,
@@ -58,6 +63,12 @@ export async function POST(request: Request): Promise<Response> {
     if (subscriber === undefined) {
       return sendNotFound("Token not found");
     }
+
+    await sendDiscordInfo(
+      env.DISCORD_LOGGING_WEBHOOK_URL,
+      "Successfully unsubscribed",
+      "Unsubscribe - Success"
+    );
 
     return sendSuccess<UnsubscribeResponse>({
       message: "Successfully unsubscribed",

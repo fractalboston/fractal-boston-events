@@ -34,15 +34,15 @@
 
 ## Phase 3: Comprehensive Discord Logging
 
-- [ ] Add success logging to `/api/subscribe` route (log successful subscriptions)
-- [ ] Add success logging to `/api/verify` route (log successful verifications)
-- [ ] Add success logging to `/api/unsubscribe` route (log successful unsubscribes)
-- [ ] Add logging to `/api/webhooks/luma/subscriber` route (log successful subscriber additions)
-- [ ] Add logging to `/api/webhooks/luma/event` route (log successful event creations)
-- [ ] Update `/api/verify/route.ts` to log email operations (welcome email sending)
-- [ ] Update `/api/webhooks/luma/subscriber/route.ts` to check EMAIL_ENABLED and log email operations
-- [ ] Update `/api/webhooks/luma/event/route.ts` to check EMAIL_ENABLED and log email operations
-- [ ] Update `/api/cron/weekly/route.ts` to uncomment email sending code, add EMAIL_ENABLED check, and add Discord logging
+- [x] Add success logging to `/api/subscribe` route (log successful subscriptions)
+- [x] Add success logging to `/api/verify` route (log successful verifications)
+- [x] Add success logging to `/api/unsubscribe` route (log successful unsubscribes)
+- [x] Add logging to `/api/webhooks/luma/subscriber` route (log successful subscriber additions)
+- [x] Add logging to `/api/webhooks/luma/event` route (log successful event creations)
+- [x] Update `/api/verify/route.ts` to log email operations (welcome email sending)
+- [x] Update `/api/webhooks/luma/subscriber/route.ts` to check EMAIL_ENABLED and log email operations
+- [x] Update `/api/webhooks/luma/event/route.ts` to check EMAIL_ENABLED and log email operations
+- [x] Update `/api/cron/weekly/route.ts` to uncomment email sending code, add EMAIL_ENABLED check, and add Discord logging
 
 ## Phase 4: Subscriber Import Scripts
 

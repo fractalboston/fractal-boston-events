@@ -5,7 +5,11 @@ import {
   sendSuccess,
 } from "@/lib/api-response";
 import { validateLumaWebhook } from "@/lib/auth";
-import { sendDiscordError, sendDiscordNewEventAlert } from "@/lib/discord";
+import {
+  sendDiscordError,
+  sendDiscordInfo,
+  sendDiscordNewEventAlert,
+} from "@/lib/discord";
 import { sendBatchEmails } from "@/lib/email";
 import { env } from "@/lib/env";
 import {
@@ -38,12 +42,23 @@ export async function POST(request: Request): Promise<Response> {
     const webhookEvent = payload.data.event;
 
     if (!isEventWithinNextWeek(webhookEvent)) {
+      await sendDiscordInfo(
+        env.DISCORD_LOGGING_WEBHOOK_URL,
+        `Luma event webhook: Event "${webhookEvent.name}" is not within next week, skipping`,
+        "Luma Event - Skipped"
+      );
       return sendSuccess<WebhookResponse>({
         message: "Event is not within the next week, skipping notification",
       });
     }
 
     const event = convertWebhookEventToLumaEvent(webhookEvent);
+
+    await sendDiscordInfo(
+      env.DISCORD_LOGGING_WEBHOOK_URL,
+      `New event created: "${event.event.name}" (${event.start_at})`,
+      "Luma Event - Created"
+    );
 
     try {
       await sendDiscordNewEventAlert(env.DISCORD_EVENTS_WEBHOOK_URL, event);
