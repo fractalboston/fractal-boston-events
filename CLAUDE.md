@@ -133,7 +133,7 @@ See `.env.example` for detailed documentation on all environment variables, incl
 | `DISCORD_EVENTS_WEBHOOK_URL`   | Yes      | Discord webhook for event notifications    |
 | `DISCORD_LOGGING_WEBHOOK_URL`  | Yes      | Discord webhook for errors & metrics       |
 | `RESEND_API_KEY`               | Yes      | Email service                              |
-| `DATABASE_URL`                 | Yes      | Postgres connection                        |
+| `POSTGRES_URL`                 | Yes      | Postgres connection                        |
 | `SUBSCRIBE_API_KEY`            | Yes      | API security                               |
 | `APP_URL`                      | Yes      | Base URL for email links                   |
 

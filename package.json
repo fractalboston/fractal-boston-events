@@ -14,7 +14,8 @@
     "test": "vitest run",
     "check": "yarn format:check && yarn test && yarn lint && yarn check:types",
     "db:generate": "kysely-codegen --out-file src/db/types.ts",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
     "env-var": "^7.5.0",

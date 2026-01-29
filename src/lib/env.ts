@@ -7,7 +7,7 @@ export type Env = {
   DISCORD_EVENTS_WEBHOOK_URL: string;
   DISCORD_LOGGING_WEBHOOK_URL: string;
   DISCORD_MOD_ROLE_ID: string;
-  // DATABASE_URL: string;
+  POSTGRES_URL: string;
   SUBSCRIBE_API_KEY: string;
   APP_URL: string;
   // CRON_SECRET?: string;
@@ -26,7 +26,7 @@ const config: Env = {
     .required()
     .asUrlString(),
   DISCORD_MOD_ROLE_ID: env.get("DISCORD_MOD_ROLE_ID").required().asString(),
-  // DATABASE_URL: env.get("DATABASE_URL").required().asString(),
+  POSTGRES_URL: env.get("POSTGRES_URL").required().asString(),
   SUBSCRIBE_API_KEY: env.get("SUBSCRIBE_API_KEY").required().asString(),
   APP_URL: env.get("APP_URL").required().asUrlString(),
   // CRON_SECRET: env.get("CRON_SECRET").asString(),

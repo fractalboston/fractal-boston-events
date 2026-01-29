@@ -8,7 +8,7 @@ This command automates the following loop:
 
 1. Run `yarn format` **(outside sandbox)**
 2. Run `yarn check` **(outside sandbox)**
-3. Fix any lint errors or type issues
+3. Fix any lint errors or type issues. Ignore the url.parse() deprecation warning.
 4. If any issues arose, go back to step 1 and restart this loop
 
 ## Step 1: Format Code
@@ -36,6 +36,8 @@ yarn check
 - Run tests
 
 ## Step 3: Fix Issues
+
+IMPORTANT: Ignore the first url.parse() deprecation warning for the purposes of this step.
 
 If `yarn check` reports any errors:
 

@@ -19,7 +19,7 @@ export type Database = {
 };
 
 const pool = new Pool({
-  connectionString: env.DATABASE_URL,
+  connectionString: env.POSTGRES_URL,
   ssl: { rejectUnauthorized: false },
 });
 
