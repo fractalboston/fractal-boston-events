@@ -47,9 +47,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     try {
-      const events = await fetchUpcomingEvents(
-        env.LUMA_CALENDAR_ID
-      );
+      const events = await fetchUpcomingEvents(env.LUMA_CALENDAR_ID);
       await sendWelcomeEmail(
         subscriber.email,
         subscriber.token,

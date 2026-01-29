@@ -111,7 +111,7 @@ export function parseLumaEventCreatedWebhook(
   return parsed.data;
 }
 
-export function isEventWithinNextWeek(event: LumaEvent): boolean {
+export function isEventWithinNextWeek(event: { start_at: string }): boolean {
   const now = new Date();
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const eventStart = new Date(event.start_at);
@@ -366,3 +366,121 @@ export type LumaWebhookSubscriber = z.infer<typeof lumaWebhookSubscriberSchema>;
 export type LumaWebhookEventCreated = z.infer<
   typeof lumaWebhookEventCreatedSchema
 >;
+export type LumaWebhookEvent = z.infer<typeof webhookEventSchema>;
+
+export function convertWebhookEventToLumaEvent(
+  webhookEvent: LumaWebhookEvent
+): LumaEvent {
+  return {
+    api_id: webhookEvent.api_id,
+    event: {
+      api_id: webhookEvent.api_id,
+      calendar_api_id: "",
+      cover_url: webhookEvent.cover_url ?? "",
+      end_at: webhookEvent.end_at,
+      event_type: "event",
+      hide_rsvp: false,
+      location_type:
+        webhookEvent.geo_address_json !== null ? "physical" : "virtual",
+      name: webhookEvent.name,
+      one_to_one: false,
+      recurrence_id: null,
+      show_guest_list: true,
+      start_at: webhookEvent.start_at,
+      timezone: "America/New_York",
+      url: webhookEvent.url,
+      user_api_id: "",
+      visibility: "public",
+      virtual_info: {
+        has_access: false,
+      },
+      geo_address_info: webhookEvent.geo_address_json
+        ? {
+            city: webhookEvent.geo_address_json.city ?? "",
+            type: "point_of_interest",
+            mode: "manual",
+            city_state: webhookEvent.geo_address_json.city ?? "",
+            localized: null,
+          }
+        : {
+            city: "",
+            type: "point_of_interest",
+            mode: "manual",
+            city_state: "",
+            localized: null,
+          },
+      geo_address_visibility: "public",
+      coordinate: {
+        longitude: 0,
+        latitude: 0,
+      },
+      waitlist_enabled: false,
+      waitlist_status: "none",
+    },
+    cover_image: {
+      vibrant_color: null,
+      colors: [],
+      palette: null,
+    },
+    calendar: {
+      access_level: "public",
+      api_id: "",
+      avatar_url: "",
+      coordinate: null,
+      cover_image_url: "",
+      description_short: null,
+      event_submission_restriction: "anyone",
+      geo_city: null,
+      geo_country: null,
+      geo_region: null,
+      google_measurement_id: null,
+      instagram_handle: null,
+      is_blocked: false,
+      launch_status: "launched",
+      linkedin_handle: null,
+      luma_plus_active: false,
+      meta_pixel_id: null,
+      name: "Fractal Boston",
+      personal_user_api_id: null,
+      refund_policy: null,
+      slug: null,
+      social_image_url: null,
+      stripe_account_id: null,
+      tax_config: null,
+      tiktok_handle: null,
+      timezone: null,
+      tint_color: "#000000",
+      track_meta_ads_from_luma: false,
+      twitter_handle: null,
+      verified_at: null,
+      website: null,
+      youtube_handle: null,
+      is_personal: false,
+      personal_user: null,
+    },
+    start_at: webhookEvent.start_at,
+    hosts: [],
+    guest_count: 0,
+    ticket_count: 0,
+    ticket_info: {
+      price: null,
+      is_free: true,
+      max_price: null,
+      is_sold_out: false,
+      spots_remaining: null,
+      is_near_capacity: false,
+      require_approval: false,
+      currency_info: null,
+    },
+    featured_guests: [],
+    role: null,
+    waitlist_active: false,
+    featured_city: null,
+    calendar_api_id: "",
+    is_manager: false,
+    platform: "web",
+    status: "published",
+    submitted_by_user_api_id: "",
+    tags: [],
+  };
+}
