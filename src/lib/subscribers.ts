@@ -6,7 +6,7 @@ export type Subscriber = SubscribersTable;
 
 export type CreateSubscriberInput = {
   email: string;
-  source: "form" | "luma";
+  source: "form" | "luma" | "substack";
   status?: SubscriberStatus;
 };
 

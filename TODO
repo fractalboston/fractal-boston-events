@@ -46,17 +46,17 @@
 
 ## Phase 4: Subscriber Import Scripts
 
-- [ ] Research Luma API endpoints for fetching calendar subscribers
-- [ ] Create `scripts/pull-luma-subscribers.ts` script
-- [ ] Import Luma subscribers with source="luma" and status="verified"
-- [ ] Handle duplicate emails (check by email before inserting)
-- [ ] Add Discord logging for Luma import stats (new subscribers added, duplicates skipped)
-- [ ] Research Substack API endpoints for fetching subscriber list
-- [ ] Add SUBSTACK_API_KEY to `.env.example` with documentation
-- [ ] Create `scripts/pull-substack-subscribers.ts` script
-- [ ] Import Substack subscribers with source="substack" and status="verified"
-- [ ] Handle duplicate emails (check by email before inserting)
-- [ ] Add Discord logging for Substack import stats (new subscribers added, duplicates skipped)
+- [x] Research Luma API endpoints for fetching calendar subscribers
+- [x] Create `scripts/pull-luma-subscribers.ts` script
+- [x] Import Luma subscribers with source="luma" and status="verified"
+- [x] Handle duplicate emails (check by email before inserting)
+- [x] Add Discord logging for Luma import stats (new subscribers added, duplicates skipped)
+- [x] Research Substack API endpoints for fetching subscriber list
+- [x] Add SUBSTACK_API_KEY to `.env.example` with documentation
+- [x] Create `scripts/pull-substack-subscribers.ts` script
+- [x] Import Substack subscribers with source="substack" and status="verified"
+- [x] Handle duplicate emails (check by email before inserting)
+- [x] Add Discord logging for Substack import stats (new subscribers added, duplicates skipped)
 
 ## Phase 5: Verification & Testing
 
