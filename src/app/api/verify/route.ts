@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  handleOptionsRequest,
   sendBadRequest,
   sendInternalError,
   sendNotFound,
@@ -19,6 +20,10 @@ type VerifyResponse = {
   message: string;
   email: string;
 };
+
+export async function OPTIONS(): Promise<Response> {
+  return handleOptionsRequest();
+}
 
 export async function POST(request: Request): Promise<Response> {
   let body: unknown;

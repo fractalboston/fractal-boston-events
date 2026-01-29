@@ -19,13 +19,13 @@
 
 ## Phase 2: API Readiness for External Site (fractal.boston)
 
-- [ ] Add CORS headers to `/api/verify` route to allow requests from fractal.boston
-- [ ] Add CORS headers to `/api/unsubscribe` route to allow requests from fractal.boston
-- [ ] Add CORS headers to `/api/subscribe` route to allow requests from fractal.boston
-- [ ] Verify API endpoints use POST only (no GET support needed)
-- [ ] Verify APP_URL environment variable is configured correctly (should be https://fractal.boston in production)
-- [ ] Verify all email links point to fractal.boston (verify/unsubscribe pages are in separate project)
-- [ ] Create API.md documentation file with:
+- [x] Add CORS headers to `/api/verify` route to allow requests from fractal.boston
+- [x] Add CORS headers to `/api/unsubscribe` route to allow requests from fractal.boston
+- [x] Add CORS headers to `/api/subscribe` route to allow requests from fractal.boston
+- [x] Verify API endpoints use POST only (no GET support needed)
+- [x] Verify APP_URL environment variable is configured correctly (should be https://fractal.boston in production)
+- [x] Verify all email links point to fractal.boston (verify/unsubscribe pages are in separate project)
+- [x] Create API.md documentation file with:
   - All endpoint documentation (subscribe, verify, unsubscribe)
   - Request/response formats
   - Example client-side code (fetch/axios) for fractal.boston
