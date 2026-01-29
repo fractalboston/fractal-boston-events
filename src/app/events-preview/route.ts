@@ -25,7 +25,7 @@ function generateHtml(events: LumaEvent[]): string {
         <p style="margin: 0; color: #666; font-size: 14px;">
           📅 ${formatEventDate(event.start_at)}
         </p>
-        ${event.event.geo_address_info.city !== undefined && event.event.geo_address_info.city !== "" ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 14px;">📍 ${event.event.geo_address_info.city}</p>` : ""}
+        ${event.event.geo_address_info.city !== "" ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 14px;">📍 ${event.event.geo_address_info.city}</p>` : ""}
       </div>
     `
     )
@@ -45,7 +45,7 @@ function generateHtml(events: LumaEvent[]): string {
         ${events.length === 0 ? "<p>No events scheduled for the next 7 days.</p>" : `<div style="margin-top: 16px;">${eventItems}</div>`}
         <hr style="margin-top: 32px; border: none; border-top: 1px solid #e5e5e5;">
         <p style="font-size: 12px; color: #999; margin-top: 16px;">
-          Total: ${events.length} event${events.length === 1 ? "" : "s"}
+          Total: ${String(events.length)} event${String(events.length) === "1" ? "" : "s"}
         </p>
       </body>
     </html>
