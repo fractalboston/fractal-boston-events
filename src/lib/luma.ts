@@ -35,8 +35,15 @@ async function fetchEventsPage(
     throw new Error(`Response validation failed: ${parsed.error.message}`);
   }
 
-  // Map entry.event (eventDetailSchema) to LumaEvent format
-  const events = parsed.data.entries;
+  // Filter to only entries that have the event property (valid LumaEvent entries)
+  // Validate each entry against the eventSchema to ensure it's a proper event
+  const events: LumaEvent[] = [];
+  for (const entry of parsed.data.entries) {
+    const validated = eventSchema.safeParse(entry);
+    if (validated.success) {
+      events.push(validated.data);
+    }
+  }
 
   // Determine next cursor: use pagination_cursor if available, otherwise use last entry's api_id if has_more
   let nextCursor: string | null = null;
@@ -329,8 +336,11 @@ const eventSchema = z.object({
   tags: z.array(z.unknown()),
 });
 
+// Schema for entries that might not have the event property (e.g., other calendar item types)
+const calendarItemSchema = z.unknown();
+
 const eventListSchema = z.object({
-  entries: z.array(eventSchema),
+  entries: z.array(z.union([eventSchema, calendarItemSchema])),
   has_more: z.boolean(),
   pagination_cursor: z.string().nullable().optional(),
 });

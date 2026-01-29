@@ -20,7 +20,7 @@ function generateHtml(events: LumaEvent[]): string {
       (event) => `
       <div style="margin-bottom: 24px; padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px;">
         <h3 style="margin: 0 0 8px 0; color: #1a1a1a;">
-          <a href="https://luma.com/${event.event.url}" style="color: #2563eb; text-decoration: none;">${event.event.name}</a>
+          <a href="${event.event.url.startsWith("http") ? event.event.url : `https://lu.ma/${event.event.url}`}" style="color: #2563eb; text-decoration: none;">${event.event.name}</a>
         </h3>
         <p style="margin: 0; color: #666; font-size: 14px;">
           📅 ${formatEventDate(event.start_at)}
