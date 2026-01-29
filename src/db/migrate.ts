@@ -1,11 +1,31 @@
 import * as path from "path";
+import "dotenv/config";
+import env from "env-var";
 import { promises as fs } from "fs";
-import { FileMigrationProvider, Migrator } from "kysely";
+import {
+  FileMigrationProvider,
+  Kysely,
+  Migrator,
+  PostgresDialect,
+} from "kysely";
+import { Pool } from "pg";
 import { fileURLToPath } from "url";
-import { db } from "./index";
+import type { Database } from "./index";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Create a database connection for migrations using direct connection (port 5432)
+// Migrations require direct connection, not transaction pooler
+const postgresUrl = env.get("POSTGRES_DIRECT_URL").required().asString();
+const pool = new Pool({
+  connectionString: postgresUrl,
+  ssl: { rejectUnauthorized: false },
+});
+
+const db = new Kysely<Database>({
+  dialect: new PostgresDialect({ pool }),
+});
 
 function getMigrator(): Migrator {
   return new Migrator({
