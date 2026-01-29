@@ -31,7 +31,7 @@ function generateEventsHtml(events: LumaEvent[]): string {
       (event) => `
       <div style="margin-bottom: 24px; padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px;">
         <h3 style="margin: 0 0 8px 0; color: #1a1a1a;">
-          <a href="${event.url}" style="color: #2563eb; text-decoration: none;">${event.name}</a>
+          <a href="${event.event.url}" style="color: #2563eb; text-decoration: none;">${event.event.name}</a>
         </h3>
         <p style="margin: 0; color: #666; font-size: 14px;">
           📅 ${formatEventDate(event.start_at)}
@@ -167,7 +167,7 @@ export async function sendNewEventAlert(
     <p>A new event was just added:</p>
     ${generateEventsHtml([event])}
     <p>
-      <a href="${event.url}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+      <a href="${event.event.url}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
         RSVP Now
       </a>
     </p>
@@ -177,7 +177,7 @@ export async function sendNewEventAlert(
   await resend.emails.send({
     from: "Fractal Events <events@fractal.boston>",
     to: email,
-    subject: `New Event: ${event.name}`,
+    subject: `New Event: ${event.event.name}`,
     html: wrapInEmailTemplate(content, unsubscribeUrl),
   });
 }

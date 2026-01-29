@@ -1,0 +1,5 @@
+- [ ] set up Resend with our domain for sending
+- [ ] create a page like the health check page that lists all events it would email about
+- [ ] make a way to send myself test emails
+- [ ] vercel login and figure out deployment
+- [x] set up the database
