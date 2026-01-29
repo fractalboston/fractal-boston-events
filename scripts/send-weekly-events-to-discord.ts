@@ -15,10 +15,10 @@ async function main(): Promise<void> {
   try {
     const { sendDiscordWeeklySummary } = await import("../src/lib/discord");
     const { env } = await import("../src/lib/env");
-    const { fetchUpcomingEvents } = await import("../src/lib/luma");
+    const { getReportableEvents } = await import("../src/lib/luma");
 
     console.log("Fetching events from Luma...");
-    const events = await fetchUpcomingEvents(env.LUMA_CALENDAR_ID);
+    const events = await getReportableEvents(env.LUMA_CALENDAR_ID);
 
     console.log(
       `Found ${String(events.length)} event(s) for the upcoming week`

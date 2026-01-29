@@ -11,6 +11,9 @@ export default function Home(): ReactElement {
       <p>
         <Link href="/api/health">Health Check</Link>
       </p>
+      <p>
+        <Link href="/api/events-preview">Events Preview</Link>
+      </p>
     </div>
   );
 }

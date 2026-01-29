@@ -8,7 +8,7 @@ import { validateLumaWebhook } from "@/lib/auth";
 import { sendDiscordError } from "@/lib/discord";
 import { sendWelcomeEmail } from "@/lib/email";
 import { env } from "@/lib/env";
-import { fetchUpcomingEvents, parseLumaSubscriberWebhook } from "@/lib/luma";
+import { getReportableEvents, parseLumaSubscriberWebhook } from "@/lib/luma";
 import { createSubscriber, getSubscriberByEmail } from "@/lib/subscribers";
 
 type WebhookResponse = {
@@ -47,7 +47,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     try {
-      const events = await fetchUpcomingEvents(env.LUMA_CALENDAR_ID);
+      const events = await getReportableEvents(env.LUMA_CALENDAR_ID);
       await sendWelcomeEmail(
         subscriber.email,
         subscriber.token,

@@ -91,6 +91,17 @@ export async function fetchUpcomingEvents(
   return allEvents;
 }
 
+/**
+ * Gets the set of events that should be reported via email or Discord.
+ * This is the single source of truth for determining which events to notify about.
+ * Returns events within the next 7 days.
+ */
+export async function getReportableEvents(
+  calendarId: string
+): Promise<LumaEvent[]> {
+  return fetchUpcomingEvents(calendarId);
+}
+
 export function parseLumaSubscriberWebhook(
   payload: unknown
 ): LumaWebhookSubscriber {

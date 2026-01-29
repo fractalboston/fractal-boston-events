@@ -7,7 +7,7 @@ import {
 } from "@/lib/discord";
 import { sendBatchEmails } from "@/lib/email";
 import { env } from "@/lib/env";
-import { fetchUpcomingEvents } from "@/lib/luma";
+import { getReportableEvents } from "@/lib/luma";
 import { getAllVerifiedSubscribers } from "@/lib/subscribers";
 
 type CronResponse = {
@@ -32,7 +32,7 @@ export async function GET(): Promise<Response> {
       APP_URL,
     } = env;
 
-    const events = await fetchUpcomingEvents(LUMA_CALENDAR_ID);
+    const events = await getReportableEvents(LUMA_CALENDAR_ID);
 
     try {
       await sendDiscordWeeklySummary(
