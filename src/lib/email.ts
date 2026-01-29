@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { env } from "@/lib/env";
+import { sendDiscordEmailLog } from "@/lib/discord";
 import { getReportableEvents } from "@/lib/luma";
 import type { LumaEvent } from "@/lib/luma";
 
@@ -111,13 +112,22 @@ export async function sendVerificationEmail(
     </p>
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: "Fractal Events <events@fractal.boston>",
-    to: email,
-    subject: "Verify your Fractal Events subscription",
-    html: wrapInEmailTemplate(content, "#"),
-  });
+  if (env.EMAIL_ENABLED) {
+    const resend = getResend();
+    await resend.emails.send({
+      from: "Fractal Events <events@fractal.boston>",
+      to: email,
+      subject: "Verify your Fractal Events subscription",
+      html: wrapInEmailTemplate(content, "#"),
+    });
+  }
+
+  await sendDiscordEmailLog(
+    env.DISCORD_LOGGING_WEBHOOK_URL,
+    "verification",
+    1,
+    env.EMAIL_ENABLED
+  );
 }
 
 export async function sendWelcomeEmail(
@@ -135,20 +145,30 @@ export async function sendWelcomeEmail(
     ${generateEventsHtml(events)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: "Fractal Events <events@fractal.boston>",
-    to: email,
-    subject: "Welcome to Fractal Events - Here's what's coming up!",
-    html: wrapInEmailTemplate(content, unsubscribeUrl),
-  });
+  if (env.EMAIL_ENABLED) {
+    const resend = getResend();
+    await resend.emails.send({
+      from: "Fractal Events <events@fractal.boston>",
+      to: email,
+      subject: "Welcome to Fractal Events - Here's what's coming up!",
+      html: wrapInEmailTemplate(content, unsubscribeUrl),
+    });
+  }
+
+  await sendDiscordEmailLog(
+    env.DISCORD_LOGGING_WEBHOOK_URL,
+    "welcome",
+    1,
+    env.EMAIL_ENABLED
+  );
 }
 
 export async function sendWeeklyDigest(
   email: string,
   token: string,
   events: LumaEvent[],
-  appUrl: string
+  appUrl: string,
+  skipLogging = false
 ): Promise<void> {
   const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
 
@@ -161,20 +181,32 @@ export async function sendWeeklyDigest(
   `;
 
   const eventCount = String(events.length);
-  const resend = getResend();
-  await resend.emails.send({
-    from: "Fractal Events <events@fractal.boston>",
-    to: email,
-    subject: `This Week at Fractal (${eventCount} event${events.length === 1 ? "" : "s"})`,
-    html: wrapInEmailTemplate(content, unsubscribeUrl),
-  });
+  if (env.EMAIL_ENABLED) {
+    const resend = getResend();
+    await resend.emails.send({
+      from: "Fractal Events <events@fractal.boston>",
+      to: email,
+      subject: `This Week at Fractal (${eventCount} event${events.length === 1 ? "" : "s"})`,
+      html: wrapInEmailTemplate(content, unsubscribeUrl),
+    });
+  }
+
+  if (!skipLogging) {
+    await sendDiscordEmailLog(
+      env.DISCORD_LOGGING_WEBHOOK_URL,
+      "weekly",
+      1,
+      env.EMAIL_ENABLED
+    );
+  }
 }
 
 export async function sendNewEventAlert(
   email: string,
   token: string,
   event: LumaEvent,
-  appUrl: string
+  appUrl: string,
+  skipLogging = false
 ): Promise<void> {
   const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
 
@@ -189,13 +221,24 @@ export async function sendNewEventAlert(
     </p>
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: "Fractal Events <events@fractal.boston>",
-    to: email,
-    subject: `New Event: ${event.event.name}`,
-    html: wrapInEmailTemplate(content, unsubscribeUrl),
-  });
+  if (env.EMAIL_ENABLED) {
+    const resend = getResend();
+    await resend.emails.send({
+      from: "Fractal Events <events@fractal.boston>",
+      to: email,
+      subject: `New Event: ${event.event.name}`,
+      html: wrapInEmailTemplate(content, unsubscribeUrl),
+    });
+  }
+
+  if (!skipLogging) {
+    await sendDiscordEmailLog(
+      env.DISCORD_LOGGING_WEBHOOK_URL,
+      "new-event",
+      1,
+      env.EMAIL_ENABLED
+    );
+  }
 }
 
 export async function sendBatchEmails(
@@ -215,13 +258,15 @@ export async function sendBatchEmails(
   for (const { email, token } of emails) {
     try {
       if (type === "weekly") {
-        await sendWeeklyDigest(email, token, events, appUrl);
+        await sendWeeklyDigest(email, token, events, appUrl, true);
       } else if (singleEvent !== undefined) {
-        await sendNewEventAlert(email, token, singleEvent, appUrl);
+        await sendNewEventAlert(email, token, singleEvent, appUrl, true);
       }
       success++;
-      // Small delay to stay within rate limits
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Small delay to stay within rate limits (only if emailing is enabled)
+      if (env.EMAIL_ENABLED) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       console.error(`Failed to send email to ${email}:`, err);
@@ -243,6 +288,15 @@ export async function sendBatchEmails(
       }
     }
   }
+
+  // Log batch email operation to Discord (log once for the entire batch)
+  const emailType = type === "weekly" ? "weekly" : "new-event";
+  await sendDiscordEmailLog(
+    discordWebhookUrl ?? env.DISCORD_LOGGING_WEBHOOK_URL,
+    emailType,
+    success,
+    env.EMAIL_ENABLED
+  );
 
   return { success, failed, errors };
 }

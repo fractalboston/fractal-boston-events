@@ -365,3 +365,89 @@ export async function sendDiscordEmailJobStats(
     );
   }
 }
+
+export async function sendDiscordEmailLog(
+  webhookUrl: string,
+  emailType: "verification" | "welcome" | "weekly" | "new-event",
+  recipientCount: number,
+  enabled: boolean
+): Promise<void> {
+  const emailTypeLabels: Record<
+    "verification" | "welcome" | "weekly" | "new-event",
+    string
+  > = {
+    verification: "Verification Email",
+    welcome: "Welcome Email",
+    weekly: "Weekly Digest",
+    "new-event": "New Event Alert",
+  };
+
+  const statusText = enabled
+    ? `Sent to ${String(recipientCount)} recipient${recipientCount === 1 ? "" : "s"}`
+    : `Would send to ${String(recipientCount)} recipient${recipientCount === 1 ? "" : "s"} (emailing disabled)`;
+
+  const payload: DiscordWebhookPayload = {
+    content: `📧 **${emailTypeLabels[emailType]}**: ${statusText}`,
+    embeds: [
+      {
+        title: emailTypeLabels[emailType],
+        description: statusText,
+        color: enabled ? 0x10b981 : 0x6b7280,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(
+        `Failed to send email log to Discord: ${String(response.status)} - ${text}`
+      );
+    }
+  } catch (discordError) {
+    console.error("Failed to send email log to Discord:", discordError);
+  }
+}
+
+export async function sendDiscordInfo(
+  webhookUrl: string,
+  message: string,
+  title?: string,
+  color?: number
+): Promise<void> {
+  const payload: DiscordWebhookPayload = {
+    content: title !== undefined ? `ℹ️ **${title}**` : "ℹ️ **Info**",
+    embeds: [
+      {
+        title: title ?? "Info",
+        description: message,
+        color: color ?? 0x3b82f6,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(
+        `Failed to send info to Discord: ${String(response.status)} - ${text}`
+      );
+    }
+  } catch (discordError) {
+    console.error("Failed to send info to Discord:", discordError);
+  }
+}

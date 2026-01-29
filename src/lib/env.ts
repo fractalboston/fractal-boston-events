@@ -10,6 +10,7 @@ export type Env = {
   POSTGRES_URL: string;
   SUBSCRIBE_API_KEY: string;
   APP_URL: string;
+  EMAIL_ENABLED: boolean;
   CRON_SECRET?: string;
 };
 
@@ -29,6 +30,7 @@ const config: Env = {
   POSTGRES_URL: env.get("POSTGRES_URL").required().asString(),
   SUBSCRIBE_API_KEY: env.get("SUBSCRIBE_API_KEY").required().asString(),
   APP_URL: env.get("APP_URL").required().asUrlString(),
+  EMAIL_ENABLED: env.get("EMAIL_ENABLED").default("false").asBool(),
   CRON_SECRET: env.get("CRON_SECRET").asString(),
 };
 
