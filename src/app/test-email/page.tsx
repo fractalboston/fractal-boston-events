@@ -326,7 +326,7 @@ export default function TestEmailPage(): ReactElement {
           >
             Loading…
           </div>
-        ) : previewError ? (
+        ) : previewError != null && previewError !== "" ? (
           <div
             style={{
               padding: "20px",

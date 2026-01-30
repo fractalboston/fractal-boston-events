@@ -12,7 +12,7 @@
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx}\"",
     "check:types": "tsc --noEmit",
     "test": "vitest run",
-    "check": "yarn format:check && yarn test && yarn lint && yarn check:types",
+    "check": "yarn format:check &&  yarn lint && yarn check:types && yarn test",
     "migrate": "tsx src/db/migrate.ts",
     "db:test": "tsx scripts/test-db-connection.ts",
     "email:test": "tsx scripts/send-test-email.ts"
@@ -57,5 +57,5 @@
   "resolutions": {
     "tar": "^7.0.0"
   },
-  "packageManager": "yarn@1.22.22"
+  "packageManager": "yarn@4.12.0"
 }

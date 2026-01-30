@@ -1,0 +1,92 @@
+---
+description: Always verify code changes (bug fixes, features) before considering a task complete
+alwaysApply: true
+---
+
+# Code Change Verification Requirement
+
+**CRITICAL: Always verify that code changes work correctly before considering a task complete.**
+
+## Rules
+
+1. **Always verify changes** - After making ANY code change (bug fixes, new features, refactoring, improvements, etc.), you MUST verify that the change works correctly
+2. **Run tests when possible** - If tests exist, run them to verify the change
+3. **Test manually when needed** - Manually test the change (run the code, check output, verify behavior)
+4. **Provide verification steps** - If you cannot verify the change yourself, you MUST tell the user exactly how they can verify it
+
+## Verification Methods
+
+### Automated Verification (Preferred)
+
+- Run existing checks: If `yarn check` exists, run that and it will do all the automated checks for you. If not, do as many of these as you can:
+  - Run tests: `yarn test`
+  - Check linter output: `yarn lint`
+  - Check type errors: `yarn check:types`
+  - Any other similar commands from package.json
+- Run the application and test the specific functionality
+
+### Manual Verification Steps
+
+When you cannot verify automatically, provide clear steps:
+
+```markdown
+## Verification Steps
+
+To verify this change works:
+
+1. Run `yarn dev` to start the development server
+2. Navigate to [specific URL/page]
+3. [Perform specific action]
+4. Verify that [expected behavior] occurs
+5. Check that [error condition] no longer happens (if applicable)
+```
+
+## Examples
+
+### ✅ CORRECT - Verified Change
+
+```typescript
+// Added new calculateTotal() function
+// Ran: yarn test -- calculateTotal
+// Result: All tests passing ✓
+// Verified: Function correctly handles edge cases
+```
+
+### ✅ CORRECT - Provided Verification Steps
+
+```markdown
+Added new API endpoint for event subscriptions. 
+
+**Verification Steps:**
+1. Start the dev server: `yarn dev`
+2. Make a POST request to `/api/subscribe` with a test email
+3. Verify that you receive a success response
+4. Check your email inbox for the verification email
+```
+
+### ❌ INCORRECT - No Verification
+
+```markdown
+Added the subscribe endpoint.
+```
+
+**Problem:** No verification was performed or provided to the user.
+
+## When You Cannot Verify
+
+If you cannot verify a change yourself (e.g., requires external services, user-specific setup, or manual testing), you MUST:
+
+1. **Explicitly state** that you cannot verify it yourself
+2. **Provide detailed verification steps** for the user
+3. **Explain what should happen** if the change works correctly
+4. **Ask the user to confirm** whether the change worked
+
+## Why This Matters
+
+Verifying code changes ensures that:
+- Changes work as intended and meet requirements
+- Bugs are actually resolved, not just moved or masked
+- New features function correctly
+- No regressions are introduced
+- Users can trust that changes work correctly
+- Issues don't persist or resurface later
