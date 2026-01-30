@@ -4,11 +4,11 @@ import {
   sendInternalError,
   sendSuccess,
 } from "@/lib/api-response";
-import { sendTestEmail } from "@/lib/email";
-import { isDevelopment } from "@/lib/env";
+import { sendDiscordWeeklySummary } from "@/lib/discord";
+import { env, isDevelopment } from "@/lib/env";
+import { getReportableEvents } from "@/lib/luma";
 
 const requestSchema = z.object({
-  email: z.email(),
   asOfDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -40,26 +40,32 @@ export async function POST(request: Request): Promise<Response> {
     const parsed = requestSchema.safeParse(body);
 
     if (!parsed.success) {
-      return sendBadRequest("Invalid email address");
+      return sendBadRequest("Invalid request body");
     }
 
-    const { email, asOfDate: asOfDateStr }: RequestBody = parsed.data;
+    const { asOfDate: asOfDateStr }: RequestBody = parsed.data;
 
     const asOfDate =
       asOfDateStr !== undefined ? parseAsOfDate(asOfDateStr) : undefined;
 
-    try {
-      await sendTestEmail(email, asOfDate);
+    const events = await getReportableEvents(env.LUMA_CALENDAR_ID, asOfDate);
 
-      return sendSuccess({ message: "Test email sent successfully" });
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      console.error("Failed to send test email:", err);
-      return sendInternalError(`Failed to send test email: ${err.message}`);
-    }
+    await sendDiscordWeeklySummary(
+      env.DISCORD_LOGGING_WEBHOOK_URL,
+      events,
+      env.DISCORD_MOD_ROLE_ID,
+      asOfDate
+    );
+
+    return sendSuccess({
+      message:
+        "Test weekly summary sent to Discord logging channel successfully",
+    });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.error("Test email route error:", err);
-    return sendInternalError(`Failed to process request: ${err.message}`);
+    console.error("Failed to send test Discord message:", err);
+    return sendInternalError(
+      `Failed to send test Discord message: ${err.message}`
+    );
   }
 }

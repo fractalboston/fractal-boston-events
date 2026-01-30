@@ -1,183 +1,78 @@
 import type { LumaEvent } from "@/lib/luma";
+import { getLumaEventUrl } from "@/lib/urls";
 
-type DiscordEmbed = {
-  title: string;
-  description?: string;
-  url?: string;
-  color?: number;
-  fields?: {
-    name: string;
-    value: string;
-    inline?: boolean;
-  }[];
-  timestamp?: string;
-};
+/** Discord message flag: do not include any embeds (including link previews). */
+const SUPPRESS_EMBEDS = 1 << 2;
+const TIME_ZONE = "America/New_York";
 
 type DiscordWebhookPayload = {
   content?: string;
-  embeds?: DiscordEmbed[];
+  embeds?: never[];
+  flags?: number;
 };
 
-function formatEventDate(dateString: string): string {
+/** Same format as email: "Monday, January 29, 2025 at 3:00 PM" */
+function formatEventDateLong(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
+    weekday: "long",
+    month: "long",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZone: "America/New_York",
+    timeZone: TIME_ZONE,
   });
 }
 
-function getCategoryForEvent(eventStart: Date, now: Date): string {
-  const tz = "America/New_York";
-
-  // Convert to EST and get the 4am boundary for the event
-  const eventEST = new Date(
-    eventStart.toLocaleString("en-US", { timeZone: tz })
+/** Flat event list formatted like the email (no categories). */
+function formatEventsLikeEmail(events: LumaEvent[]): string {
+  if (events.length === 0) {
+    return "No events scheduled for this week.";
+  }
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
   );
-  const event4amBoundary = new Date(eventEST);
-  event4amBoundary.setHours(4, 0, 0, 0);
-
-  // If event is before 4am, it belongs to the previous day's category
-  if (eventEST < event4amBoundary) {
-    event4amBoundary.setDate(event4amBoundary.getDate() - 1);
-  }
-
-  // Get current time in EST and find today's 4am boundary
-  const nowEST = new Date(now.toLocaleString("en-US", { timeZone: tz }));
-  const today4am = new Date(nowEST);
-  today4am.setHours(4, 0, 0, 0);
-  if (nowEST < today4am) {
-    today4am.setDate(today4am.getDate() - 1);
-  }
-
-  const todayDay = today4am.getDay(); // 0 = Sunday, 6 = Saturday
-  const eventDay = event4amBoundary.getDay();
-  const daysDiff = Math.floor(
-    (event4amBoundary.getTime() - today4am.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  // Today: events starting between 4am today and 4am tomorrow
-  if (daysDiff === 0) {
-    return "today";
-  }
-
-  // Calculate this weekend (upcoming Saturday-Sunday)
-  const thisSaturday = new Date(today4am);
-  if (todayDay < 6) {
-    // Before Saturday, this weekend is the upcoming Saturday-Sunday
-    thisSaturday.setDate(today4am.getDate() + (6 - todayDay));
-  } else if (todayDay === 6) {
-    // Today is Saturday, this weekend includes today
-    // (already set correctly)
-  } else {
-    // Today is Sunday, this weekend was yesterday
-    thisSaturday.setDate(today4am.getDate() - 1);
-  }
-
-  const thisSunday = new Date(thisSaturday);
-  thisSunday.setDate(thisSaturday.getDate() + 1);
-  const nextMonday = new Date(thisSunday);
-  nextMonday.setDate(thisSunday.getDate() + 1);
-
-  // This weekend: Saturday 4am - Monday 4am
-  if (
-    event4amBoundary.getTime() >= thisSaturday.getTime() &&
-    event4amBoundary.getTime() < nextMonday.getTime()
-  ) {
-    return "this weekend";
-  }
-
-  // Next weekend: the Saturday-Sunday after this weekend
-  const nextSaturday = new Date(thisSaturday);
-  nextSaturday.setDate(thisSaturday.getDate() + 7);
-  const nextSunday = new Date(nextSaturday);
-  nextSunday.setDate(nextSaturday.getDate() + 1);
-  const nextWeekMonday = new Date(nextSunday);
-  nextWeekMonday.setDate(nextSunday.getDate() + 1);
-
-  if (
-    event4amBoundary.getTime() >= nextSaturday.getTime() &&
-    event4amBoundary.getTime() < nextWeekMonday.getTime()
-  ) {
-    return "next weekend";
-  }
-
-  // Weekday categories
-  if (eventDay === 1) return "monday";
-  if (eventDay === 2) return "tuesday";
-  if (eventDay === 3) return "wednesday";
-  if (eventDay === 4) return "thursday";
-  if (eventDay === 5) return "next friday";
-
-  // Fallback (shouldn't happen for events in our time range)
-  return "other";
+  return sorted
+    .map(
+      (event) =>
+        `**[${event.event.name}](${getLumaEventUrl(event.event.url)})**\n${formatEventDateLong(event.start_at)}`
+    )
+    .join("\n\n");
 }
 
-function formatEventsByCategory(events: LumaEvent[]): string {
-  const now = new Date();
-  const categories: Record<string, LumaEvent[]> = {
-    today: [],
-    "this weekend": [],
-    monday: [],
-    tuesday: [],
-    wednesday: [],
-    thursday: [],
-    "next friday": [],
-    "next weekend": [],
-  };
+async function postDiscordWebhook({
+  webhookUrl,
+  payload,
+  throwOnError,
+  errorLabel,
+}: {
+  webhookUrl: string;
+  payload: DiscordWebhookPayload;
+  throwOnError: boolean;
+  errorLabel: string;
+}): Promise<void> {
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
-  // Group events by category
-  for (const event of events) {
-    const eventStart = new Date(event.start_at);
-    const category = getCategoryForEvent(eventStart, now);
-    const categoryList = categories[category];
-    if (categoryList !== undefined) {
-      categoryList.push(event);
+  if (!response.ok) {
+    const text = await response.text();
+    const message = `${errorLabel}: ${String(response.status)} - ${text}`;
+    if (throwOnError) {
+      throw new Error(message);
     }
+    console.error(message);
   }
-
-  // Build text string
-  const parts: string[] = [];
-
-  const categoryOrder = [
-    "today",
-    "this weekend",
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "next friday",
-    "next weekend",
-  ];
-
-  for (const category of categoryOrder) {
-    const categoryEvents = categories[category];
-    if (categoryEvents !== undefined && categoryEvents.length > 0) {
-      const categoryTitle =
-        category.charAt(0).toUpperCase() + category.slice(1);
-      parts.push(`### ${categoryTitle}`);
-
-      for (const event of categoryEvents) {
-        const dateStr = formatEventDate(event.start_at);
-        parts.push(
-          `• [${event.event.name}](https://luma.com/${event.event.url}) - ${dateStr}`
-        );
-      }
-
-      parts.push(""); // Empty line between categories
-    }
-  }
-
-  return parts.join("\n").trim();
 }
 
 export async function sendDiscordWeeklySummary(
   webhookUrl: string,
   events: LumaEvent[],
-  modRoleId?: string
+  modRoleId?: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for API compatibility (callers pass asOfDate)
+  asOfDate?: Date
 ): Promise<void> {
   let payload: DiscordWebhookPayload;
 
@@ -186,60 +81,47 @@ export async function sendDiscordWeeklySummary(
       modRoleId !== undefined
         ? `<@&${modRoleId}> ⚠️ No events scheduled for this week! Time to add some events.`
         : "⚠️ No events scheduled for this week!";
-    payload = { content: modPing };
+    payload = { content: modPing, embeds: [], flags: SUPPRESS_EMBEDS };
   } else {
-    const eventCount = String(events.length);
-    const eventsText = formatEventsByCategory(events);
-    const header = `# This Week at Fractal: ${eventCount} event${events.length === 1 ? "" : "s"} coming up\n\n`;
+    // Match email: "This Week at Fractal" + flat event list + "View all events →"
+    const eventsText = formatEventsLikeEmail(events);
+    const viewAllUrl = "https://lu.ma/fractalboston";
+    const content = `# This Week at Fractal\n\n${eventsText}\n\n[View all events →](${viewAllUrl})`;
 
     payload = {
-      content: header + eventsText,
+      content,
       embeds: [],
+      flags: SUPPRESS_EMBEDS,
     };
   }
 
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+  await postDiscordWebhook({
+    webhookUrl,
+    payload,
+    throwOnError: true,
+    errorLabel: "Discord webhook error",
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Discord webhook error: ${String(response.status)} - ${text}`
-    );
-  }
 }
 
 export async function sendDiscordNewEventAlert(
   webhookUrl: string,
   event: LumaEvent
 ): Promise<void> {
+  // Match email: "New Event Alert! 🚀" + "A new event was just added:" + event block + "RSVP Now" link
+  const eventUrl = getLumaEventUrl(event.event.url);
+  const eventBlock = `**[${event.event.name}](${eventUrl})**\n${formatEventDateLong(event.start_at)}`;
   const payload: DiscordWebhookPayload = {
-    content: "🚀 New event just added!",
-    embeds: [
-      {
-        title: event.event.name,
-        url: event.event.url,
-        description: `📆 ${formatEventDate(event.start_at)}`,
-        color: 0xf59e0b,
-      },
-    ],
+    content: `# New Event Alert! 🚀\n\nA new event was just added:\n\n${eventBlock}\n\n[RSVP Now](${eventUrl})`,
+    embeds: [],
+    flags: SUPPRESS_EMBEDS,
   };
 
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+  await postDiscordWebhook({
+    webhookUrl,
+    payload,
+    throwOnError: true,
+    errorLabel: "Discord webhook error",
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Discord webhook error: ${String(response.status)} - ${text}`
-    );
-  }
 }
 
 export async function sendDiscordError(
@@ -247,40 +129,23 @@ export async function sendDiscordError(
   error: Error,
   context: string
 ): Promise<void> {
+  const stack =
+    error.stack !== undefined
+      ? `\n**Stack:**\n\`\`\`\n${error.stack.slice(0, 1000)}\n\`\`\``
+      : "";
   const payload: DiscordWebhookPayload = {
-    content: "❌ **Error occurred**",
-    embeds: [
-      {
-        title: context,
-        description: `\`\`\`\n${error.message}\n\`\`\``,
-        color: 0xef4444,
-        fields: [
-          {
-            name: "Stack",
-            value:
-              error.stack !== undefined
-                ? `\`\`\`\n${error.stack.slice(0, 1000)}\n\`\`\``
-                : "No stack trace",
-          },
-        ],
-        timestamp: new Date().toISOString(),
-      },
-    ],
+    content: `❌ **Error occurred**\n\n**${context}**\n\`\`\`\n${error.message}\n\`\`\`${stack}`,
+    embeds: [],
+    flags: SUPPRESS_EMBEDS,
   };
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    await postDiscordWebhook({
+      webhookUrl,
+      payload,
+      throwOnError: false,
+      errorLabel: "Failed to send error to Discord",
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(
-        `Failed to send error to Discord: ${String(response.status)} - ${text}`
-      );
-    }
   } catch (discordError) {
     console.error("Failed to send error to Discord:", discordError);
   }
@@ -302,7 +167,7 @@ export async function sendDiscordEmailJobStats(
     year: "numeric",
     month: "long",
     day: "numeric",
-    timeZone: "America/New_York",
+    timeZone: TIME_ZONE,
   });
 
   const percentUsed =
@@ -313,57 +178,25 @@ export async function sendDiscordEmailJobStats(
   if (percentUsed >= warningThreshold) {
     content = `⚠️ ${content}\n**WARNING: Approaching Resend monthly limit!**`;
   }
+  content += `\n\n**Email Job Stats**\n`;
+  content += `📨 Emails Sent: ${String(stats.emailsSent)}\n`;
+  content += `❌ Emails Failed: ${String(stats.emailsFailed)}\n`;
+  content += `Events Included: ${String(stats.eventsCount)}\n`;
+  content += `👥 Total Subscribers: ${String(stats.subscribersCount)}\n`;
+  content += `📊 Resend Usage: ${String(stats.resendMonthlyUsed)} / ${String(stats.resendMonthlyLimit)} (${percentUsed.toFixed(1)}%)`;
 
   const payload: DiscordWebhookPayload = {
     content,
-    embeds: [
-      {
-        title: "Email Job Stats",
-        color: percentUsed >= warningThreshold ? 0xf59e0b : 0x10b981,
-        fields: [
-          {
-            name: "📨 Emails Sent",
-            value: String(stats.emailsSent),
-            inline: true,
-          },
-          {
-            name: "❌ Emails Failed",
-            value: String(stats.emailsFailed),
-            inline: true,
-          },
-          {
-            name: "📅 Events Included",
-            value: String(stats.eventsCount),
-            inline: true,
-          },
-          {
-            name: "👥 Total Subscribers",
-            value: String(stats.subscribersCount),
-            inline: true,
-          },
-          {
-            name: "📊 Resend Usage",
-            value: `${String(stats.resendMonthlyUsed)} / ${String(stats.resendMonthlyLimit)} (${percentUsed.toFixed(1)}%)`,
-            inline: false,
-          },
-        ],
-        timestamp: new Date().toISOString(),
-      },
-    ],
+    embeds: [],
+    flags: SUPPRESS_EMBEDS,
   };
 
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+  await postDiscordWebhook({
+    webhookUrl,
+    payload,
+    throwOnError: true,
+    errorLabel: "Discord webhook error",
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Discord webhook error: ${String(response.status)} - ${text}`
-    );
-  }
 }
 
 export type SendDiscordEmailLogParams = {
@@ -393,29 +226,17 @@ export async function sendDiscordEmailLog(
 
   const payload: DiscordWebhookPayload = {
     content: `📧 **${emailTypeLabels[emailType]}**: ${statusText}`,
-    embeds: [
-      {
-        title: emailTypeLabels[emailType],
-        description: statusText,
-        color: enabled ? 0x10b981 : 0x6b7280,
-        timestamp: new Date().toISOString(),
-      },
-    ],
+    embeds: [],
+    flags: SUPPRESS_EMBEDS,
   };
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    await postDiscordWebhook({
+      webhookUrl,
+      payload,
+      throwOnError: false,
+      errorLabel: "Failed to send email log to Discord",
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(
-        `Failed to send email log to Discord: ${String(response.status)} - ${text}`
-      );
-    }
   } catch (discordError) {
     console.error("Failed to send email log to Discord:", discordError);
   }
@@ -431,32 +252,20 @@ export type SendDiscordInfoParams = {
 export async function sendDiscordInfo(
   params: SendDiscordInfoParams
 ): Promise<void> {
-  const { webhookUrl, message, title, color } = params;
+  const { webhookUrl, message, title } = params;
   const payload: DiscordWebhookPayload = {
-    content: title !== undefined ? `ℹ️ **${title}**` : "ℹ️ **Info**",
-    embeds: [
-      {
-        title: title ?? "Info",
-        description: message,
-        color: color ?? 0x3b82f6,
-        timestamp: new Date().toISOString(),
-      },
-    ],
+    content: `ℹ️ **${title ?? "Info"}**\n\n${message}`,
+    embeds: [],
+    flags: SUPPRESS_EMBEDS,
   };
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    await postDiscordWebhook({
+      webhookUrl,
+      payload,
+      throwOnError: false,
+      errorLabel: "Failed to send info to Discord",
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(
-        `Failed to send info to Discord: ${String(response.status)} - ${text}`
-      );
-    }
   } catch (discordError) {
     console.error("Failed to send info to Discord:", discordError);
   }

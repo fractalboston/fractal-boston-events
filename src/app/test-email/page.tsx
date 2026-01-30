@@ -19,6 +19,12 @@ type SendEmailResponseData = {
   error?: string;
 };
 
+type SendDiscordResponseData = {
+  success: boolean;
+  data?: { message: string };
+  error?: string;
+};
+
 export default function TestEmailPage(): ReactElement {
   const [email, setEmail] = useState("");
   const [asOfDate, setAsOfDate] = useState(todayYYYYMMDD);
@@ -29,7 +35,8 @@ export default function TestEmailPage(): ReactElement {
   } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(true);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [discordLoading, setDiscordLoading] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -66,7 +73,7 @@ export default function TestEmailPage(): ReactElement {
     e: Parameters<React.SubmitEventHandler<HTMLFormElement>>[0]
   ): Promise<void> {
     e.preventDefault();
-    setLoading(true);
+    setEmailLoading(true);
     setMessage(null);
 
     try {
@@ -85,7 +92,6 @@ export default function TestEmailPage(): ReactElement {
           type: "success",
           text: data.data?.message ?? "Email sent successfully!",
         });
-        setEmail("");
       } else {
         setMessage({
           type: "error",
@@ -96,7 +102,44 @@ export default function TestEmailPage(): ReactElement {
       const err = error instanceof Error ? error : new Error(String(error));
       setMessage({ type: "error", text: `Error: ${err.message}` });
     } finally {
-      setLoading(false);
+      setEmailLoading(false);
+    }
+  }
+
+  async function handleSendDiscord(): Promise<void> {
+    setDiscordLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/test-discord", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ asOfDate }),
+      });
+
+      const data = (await response.json()) as SendDiscordResponseData;
+
+      if (data.success) {
+        setMessage({
+          type: "success",
+          text:
+            data.data?.message ??
+            "Test weekly summary sent to Discord logging channel.",
+        });
+        // Keep asOfDate unchanged so the selected preview date persists
+      } else {
+        setMessage({
+          type: "error",
+          text: data.error ?? "Failed to send to Discord",
+        });
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      setMessage({ type: "error", text: `Error: ${err.message}` });
+    } finally {
+      setDiscordLoading(false);
     }
   }
 
@@ -186,7 +229,7 @@ export default function TestEmailPage(): ReactElement {
                 setEmail(e.target.value);
               }}
               required
-              disabled={loading}
+              disabled={emailLoading}
               style={{
                 width: "220px",
                 padding: "8px 12px",
@@ -201,19 +244,38 @@ export default function TestEmailPage(): ReactElement {
           </div>
           <button
             type="submit"
-            disabled={loading}
+            disabled={emailLoading}
             style={{
-              backgroundColor: loading ? "#9ca3af" : "#2563eb",
+              backgroundColor: emailLoading ? "#9ca3af" : "#2563eb",
               color: "white",
               padding: "8px 16px",
               fontSize: "14px",
               border: "none",
               borderRadius: "6px",
-              cursor: loading ? "not-allowed" : "pointer",
+              cursor: emailLoading ? "not-allowed" : "pointer",
               fontWeight: "500",
             }}
           >
-            {loading ? "Sending…" : "Send"}
+            {emailLoading ? "Sending…" : "Send"}
+          </button>
+          <button
+            type="button"
+            disabled={discordLoading}
+            onClick={() => {
+              void handleSendDiscord();
+            }}
+            style={{
+              backgroundColor: discordLoading ? "#9ca3af" : "#5865f2",
+              color: "white",
+              padding: "8px 16px",
+              fontSize: "14px",
+              border: "none",
+              borderRadius: "6px",
+              cursor: discordLoading ? "not-allowed" : "pointer",
+              fontWeight: "500",
+            }}
+          >
+            {discordLoading ? "Sending…" : "Send to Discord"}
           </button>
         </form>
       </div>

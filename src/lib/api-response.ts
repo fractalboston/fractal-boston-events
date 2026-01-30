@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { HOMEPAGE_URL } from "@/lib/constants";
 
 export type ApiSuccessResponse<T> = {
   success: true;
@@ -66,7 +67,7 @@ export function sendInternalError(
 
 function getCorsHeaders(): Record<string, string> {
   return {
-    "Access-Control-Allow-Origin": "https://fractal.boston",
+    "Access-Control-Allow-Origin": HOMEPAGE_URL,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Api-Key",
     "Access-Control-Max-Age": "86400",

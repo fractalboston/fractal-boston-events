@@ -1,9 +1,9 @@
-"use client";
-
 import Link from "next/link";
 import type { ReactElement } from "react";
+import { isDevelopment } from "@/lib/env";
 
 export default function Home(): ReactElement {
+  const showTestEmail = isDevelopment();
   return (
     <div style={{ padding: "2rem", fontFamily: "system-ui" }}>
       <h1>Fractal Events API</h1>
@@ -14,9 +14,11 @@ export default function Home(): ReactElement {
       <p>
         <Link href="/events-preview">Events Preview</Link>
       </p>
-      <p>
-        <Link href="/test-email">Test Email</Link>
-      </p>
+      {showTestEmail && (
+        <p>
+          <Link href="/test-email">Test Email</Link>
+        </p>
+      )}
     </div>
   );
 }

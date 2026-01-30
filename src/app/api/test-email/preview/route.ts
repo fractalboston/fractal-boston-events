@@ -1,6 +1,6 @@
 import { sendInternalError, sendSuccess } from "@/lib/api-response";
 import { type EmailContent, getEmailContent } from "@/lib/email";
-import { env } from "@/lib/env";
+import { env, isDevelopment } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 
 function parseAsOfDate(dateStr: string | null): Date | null {
@@ -18,6 +18,9 @@ function parseAsOfDate(dateStr: string | null): Date | null {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  if (!isDevelopment()) {
+    return new Response(null, { status: 404 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get("date");

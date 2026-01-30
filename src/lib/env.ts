@@ -13,6 +13,7 @@ export type Env = {
   EMAIL_ENABLED: boolean;
   SUBSTACK_API_KEY?: string;
   CRON_SECRET?: string;
+  VERCEL: string | undefined;
 };
 
 const config: Env = {
@@ -34,6 +35,11 @@ const config: Env = {
   EMAIL_ENABLED: env.get("EMAIL_ENABLED").default("false").asBool(),
   SUBSTACK_API_KEY: env.get("SUBSTACK_API_KEY").asString(),
   CRON_SECRET: env.get("CRON_SECRET").asString(),
+  VERCEL: env.get("VERCEL").asString(),
 };
 
 export { config as env };
+
+export function isDevelopment(): boolean {
+  return config.VERCEL === undefined;
+}

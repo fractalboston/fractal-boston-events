@@ -1,41 +1,16 @@
 import { Resend } from "resend";
+import { EMAIL_FROM } from "@/lib/constants";
+import { sendDiscordEmailLog, sendDiscordInfo } from "@/lib/discord";
 import {
-  sendDiscordEmailLog as sendDiscordEmailLogImpl,
-  sendDiscordInfo as sendDiscordInfoImpl,
-} from "@/lib/discord";
+  buildEmailBody,
+  formatEventsSimpleHtml,
+  generateEventsHtml,
+  wrapInEmailTemplate,
+} from "@/lib/emailTemplates";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 import type { LumaEvent } from "@/lib/luma";
-
-type SendDiscordEmailLogFn = ({
-  webhookUrl,
-  emailType,
-  recipientCount,
-  enabled,
-}: {
-  webhookUrl: string;
-  emailType: "verification" | "welcome" | "weekly" | "new-event";
-  recipientCount: number;
-  enabled: boolean;
-}) => Promise<void>;
-
-type SendDiscordInfoFn = ({
-  webhookUrl,
-  message,
-  title,
-  color,
-}: {
-  webhookUrl: string;
-  message: string;
-  title?: string;
-  color?: number;
-}) => Promise<void>;
-
-const sendDiscordEmailLog: SendDiscordEmailLogFn =
-  sendDiscordEmailLogImpl as SendDiscordEmailLogFn;
-
-const sendDiscordInfo: SendDiscordInfoFn =
-  sendDiscordInfoImpl as SendDiscordInfoFn;
+import { getLumaEventUrl } from "@/lib/urls";
 
 let resendClient: Resend | null = null;
 
@@ -44,87 +19,26 @@ function getResend(): Resend {
   return resendClient;
 }
 
-function formatEventDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "America/New_York",
+async function sendEmailIfEnabled({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  if (!env.EMAIL_ENABLED) {
+    return;
+  }
+
+  const resend = getResend();
+  await resend.emails.send({
+    from: EMAIL_FROM,
+    to,
+    subject,
+    html,
   });
-}
-
-function formatEventsPlainText(events: LumaEvent[]): string {
-  if (events.length === 0) {
-    return "<p>No events scheduled for this week.</p>";
-  }
-
-  const eventItems = events
-    .map(
-      (event) =>
-        `<p><a href="https://lu.ma/${event.event.url}">${event.event.name}</a><br>${formatEventDate(event.start_at)}</p>`
-    )
-    .join("");
-
-  return eventItems;
-}
-
-function generateEventsHtml(events: LumaEvent[]): string {
-  if (events.length === 0) {
-    return "<p>No events scheduled for this week.</p>";
-  }
-
-  const eventItems = events
-    .map(
-      (event) => `
-      <div style="margin-bottom: 24px; padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px;">
-        <h3 style="margin: 0 0 8px 0; color: #1a1a1a;">
-          <a href="${event.event.url}" style="color: #2563eb; text-decoration: none;">${event.event.name}</a>
-        </h3>
-        <p style="margin: 0; color: #666; font-size: 14px;">
-          📅 ${formatEventDate(event.start_at)}
-        </p>
-      </div>
-    `
-    )
-    .join("");
-
-  return `
-    <div style="margin-top: 16px;">
-      ${eventItems}
-    </div>
-  `;
-}
-
-function wrapInEmailTemplate(content: string, unsubscribeUrl: string): string {
-  return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a1a;">
-        ${content}
-        <hr style="margin-top: 32px; border: none; border-top: 1px solid #e5e5e5;">
-        <div style="margin-top: 16px; padding: 16px; background-color: #f9fafb; border-radius: 8px;">
-          <p style="font-size: 14px; color: #666; margin: 0 0 12px 0; font-weight: 600;">
-            Fractal Boston
-          </p>
-          <p style="font-size: 12px; color: #999; margin: 0 0 8px 0;">
-            <a href="https://fractal.boston" style="color: #2563eb; text-decoration: none;">fractal.boston</a>
-            • <a href="https://lu.ma/fractalboston" style="color: #2563eb; text-decoration: none;">Calendar</a>
-            • <a href="https://discord.gg/fractalboston" style="color: #2563eb; text-decoration: none;">Discord</a>
-          </p>
-          <p style="font-size: 12px; color: #999; margin: 0;">
-            <a href="${unsubscribeUrl}" style="color: #999; text-decoration: none;">Unsubscribe</a> from these emails.
-          </p>
-        </div>
-      </body>
-    </html>
-  `;
 }
 
 export async function sendVerificationEmail(
@@ -145,15 +59,11 @@ export async function sendVerificationEmail(
     </p>
   `;
 
-  if (env.EMAIL_ENABLED) {
-    const resend = getResend();
-    await resend.emails.send({
-      from: "Fractal Events <events@fractal.boston>",
-      to: email,
-      subject: "Verify your Fractal Events subscription",
-      html: wrapInEmailTemplate(content, "#"),
-    });
-  }
+  await sendEmailIfEnabled({
+    to: email,
+    subject: "Verify your Fractal Events subscription",
+    html: wrapInEmailTemplate(buildEmailBody(content, "#")),
+  });
 
   await sendDiscordEmailLog({
     webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
@@ -178,15 +88,11 @@ export async function sendWelcomeEmail(
     ${generateEventsHtml(events)}
   `;
 
-  if (env.EMAIL_ENABLED) {
-    const resend = getResend();
-    await resend.emails.send({
-      from: "Fractal Events <events@fractal.boston>",
-      to: email,
-      subject: "Welcome to Fractal Events - Here's what's coming up!",
-      html: wrapInEmailTemplate(content, unsubscribeUrl),
-    });
-  }
+  await sendEmailIfEnabled({
+    to: email,
+    subject: "Welcome to Fractal Events - Here's what's coming up!",
+    html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
+  });
 
   await sendDiscordEmailLog({
     webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
@@ -214,15 +120,11 @@ export async function sendWeeklyDigest(
   `;
 
   const eventCount = String(events.length);
-  if (env.EMAIL_ENABLED) {
-    const resend = getResend();
-    await resend.emails.send({
-      from: "Fractal Events <events@fractal.boston>",
-      to: email,
-      subject: `This Week at Fractal (${eventCount} event${events.length === 1 ? "" : "s"})`,
-      html: wrapInEmailTemplate(content, unsubscribeUrl),
-    });
-  }
+  await sendEmailIfEnabled({
+    to: email,
+    subject: `This Week at Fractal (${eventCount} event${events.length === 1 ? "" : "s"})`,
+    html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
+  });
 
   if (!skipLogging) {
     await sendDiscordEmailLog({
@@ -248,21 +150,17 @@ export async function sendNewEventAlert(
     <p>A new event was just added:</p>
     ${generateEventsHtml([event])}
     <p>
-      <a href="${event.event.url}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+      <a href="${getLumaEventUrl(event.event.url)}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
         RSVP Now
       </a>
     </p>
   `;
 
-  if (env.EMAIL_ENABLED) {
-    const resend = getResend();
-    await resend.emails.send({
-      from: "Fractal Events <events@fractal.boston>",
-      to: email,
-      subject: `New Event: ${event.event.name}`,
-      html: wrapInEmailTemplate(content, unsubscribeUrl),
-    });
-  }
+  await sendEmailIfEnabled({
+    to: email,
+    subject: `New Event: ${event.event.name}`,
+    html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
+  });
 
   if (!skipLogging) {
     await sendDiscordEmailLog({
@@ -282,6 +180,10 @@ export async function sendBatchEmails(
   singleEvent?: LumaEvent,
   discordWebhookUrl?: string
 ): Promise<{ success: number; failed: number; errors: Error[] }> {
+  if (type === "new-event" && singleEvent === undefined) {
+    throw new Error("singleEvent is required for new-event batch emails.");
+  }
+
   let success = 0;
   let failed = 0;
   const errors: Error[] = [];
@@ -347,22 +249,16 @@ export function getEmailContent(
   events: LumaEvent[],
   isTest: boolean
 ): EmailContent {
-  const eventsText = formatEventsPlainText(events);
-  const footer = `
-  ---<br>
-  links: <a href="https://fractal.boston">fractal.boston</a> | <a href="https://fractal.boston/calendar">/calendar</a> | <a href="https://fractal.boston/discord">/discord</a>
-  `.trim();
-  const html = `
+  const eventsText = formatEventsSimpleHtml(events);
+  const content = `
     <p>Here's what's coming up this week:</p>
     ${eventsText}
-    <p>
-    ${footer}
-    </p>
   `;
+  const body = buildEmailBody(content, "#");
   return {
-    from: "Fractal Events <events@fractal.boston>",
+    from: EMAIL_FROM,
     subject: `${isTest ? "[TEST] " : ""} Upcoming Fractal Events`,
-    html,
+    html: wrapInEmailTemplate(body),
   };
 }
 
