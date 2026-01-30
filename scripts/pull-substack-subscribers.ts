@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { env } from "@/lib/env";
 import { sendDiscordInfo } from "@/lib/discord";
+import { env } from "@/lib/env";
 import { createSubscriber, getSubscriberByEmail } from "@/lib/subscribers";
 
 /**
@@ -62,24 +62,14 @@ async function main(): Promise<void> {
     //   .filter((email) => email && email.includes("@"));
 
     // For now, return early with a message
-    console.log(
-      "⚠️  Substack subscriber import not yet implemented."
-    );
+    console.log("⚠️  Substack subscriber import not yet implemented.");
     console.log(
       "    Substack does not appear to have a public API for subscriber lists."
     );
-    console.log(
-      "    Options:"
-    );
-    console.log(
-      "    1. Export subscribers CSV from Substack dashboard"
-    );
-    console.log(
-      "    2. Update this script to parse CSV file"
-    );
-    console.log(
-      "    3. Contact Substack support for API access"
-    );
+    console.log("    Options:");
+    console.log("    1. Export subscribers CSV from Substack dashboard");
+    console.log("    2. Update this script to parse CSV file");
+    console.log("    3. Contact Substack support for API access");
     process.exit(0);
 
     // Uncomment and implement once import method is determined:
@@ -102,11 +92,11 @@ async function main(): Promise<void> {
       newCount++;
     }
 
-    await sendDiscordInfo(
-      env.DISCORD_LOGGING_WEBHOOK_URL,
-      `Substack import complete: ${String(newCount)} new subscribers, ${String(duplicateCount)} duplicates skipped`,
-      "Substack Subscriber Import"
-    );
+    await sendDiscordInfo({
+      webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+      message: `Substack import complete: ${String(newCount)} new subscribers, ${String(duplicateCount)} duplicates skipped`,
+      title: "Substack Subscriber Import",
+    });
 
     console.log(`✅ Import complete: ${String(newCount)} new, ${String(duplicateCount)} duplicates`);
     */

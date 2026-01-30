@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { env } from "@/lib/env";
 import { sendDiscordInfo } from "@/lib/discord";
+import { env } from "@/lib/env";
 import { createSubscriber, getSubscriberByEmail } from "@/lib/subscribers";
 
 /**
@@ -40,9 +40,7 @@ async function main(): Promise<void> {
     // const subscribers = data.subscribers; // Adjust based on actual API response
 
     // For now, return early with a message
-    console.log(
-      "⚠️  Luma subscriber import not yet implemented."
-    );
+    console.log("⚠️  Luma subscriber import not yet implemented.");
     console.log(
       "    The Luma webhook (/api/webhooks/luma/subscriber) may already handle new subscribers."
     );
@@ -73,11 +71,11 @@ async function main(): Promise<void> {
       newCount++;
     }
 
-    await sendDiscordInfo(
-      env.DISCORD_LOGGING_WEBHOOK_URL,
-      `Luma import complete: ${String(newCount)} new subscribers, ${String(duplicateCount)} duplicates skipped`,
-      "Luma Subscriber Import"
-    );
+    await sendDiscordInfo({
+      webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+      message: `Luma import complete: ${String(newCount)} new subscribers, ${String(duplicateCount)} duplicates skipped`,
+      title: "Luma Subscriber Import",
+    });
 
     console.log(`✅ Import complete: ${String(newCount)} new, ${String(duplicateCount)} duplicates`);
     */

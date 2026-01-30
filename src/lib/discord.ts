@@ -366,12 +366,17 @@ export async function sendDiscordEmailJobStats(
   }
 }
 
+export type SendDiscordEmailLogParams = {
+  webhookUrl: string;
+  emailType: "verification" | "welcome" | "weekly" | "new-event";
+  recipientCount: number;
+  enabled: boolean;
+};
+
 export async function sendDiscordEmailLog(
-  webhookUrl: string,
-  emailType: "verification" | "welcome" | "weekly" | "new-event",
-  recipientCount: number,
-  enabled: boolean
+  params: SendDiscordEmailLogParams
 ): Promise<void> {
+  const { webhookUrl, emailType, recipientCount, enabled } = params;
   const emailTypeLabels: Record<
     "verification" | "welcome" | "weekly" | "new-event",
     string
@@ -416,12 +421,17 @@ export async function sendDiscordEmailLog(
   }
 }
 
+export type SendDiscordInfoParams = {
+  webhookUrl: string;
+  message: string;
+  title?: string;
+  color?: number;
+};
+
 export async function sendDiscordInfo(
-  webhookUrl: string,
-  message: string,
-  title?: string,
-  color?: number
+  params: SendDiscordInfoParams
 ): Promise<void> {
+  const { webhookUrl, message, title, color } = params;
   const payload: DiscordWebhookPayload = {
     content: title !== undefined ? `ℹ️ **${title}**` : "ℹ️ **Info**",
     embeds: [

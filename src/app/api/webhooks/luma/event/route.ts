@@ -42,11 +42,11 @@ export async function POST(request: Request): Promise<Response> {
     const webhookEvent = payload.data.event;
 
     if (!isEventWithinNextWeek(webhookEvent)) {
-      await sendDiscordInfo(
-        env.DISCORD_LOGGING_WEBHOOK_URL,
-        `Luma event webhook: Event "${webhookEvent.name}" is not within next week, skipping`,
-        "Luma Event - Skipped"
-      );
+      await sendDiscordInfo({
+        webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+        message: `Luma event webhook: Event "${webhookEvent.name}" is not within next week, skipping`,
+        title: "Luma Event - Skipped",
+      });
       return sendSuccess<WebhookResponse>({
         message: "Event is not within the next week, skipping notification",
       });
@@ -54,11 +54,11 @@ export async function POST(request: Request): Promise<Response> {
 
     const event = convertWebhookEventToLumaEvent(webhookEvent);
 
-    await sendDiscordInfo(
-      env.DISCORD_LOGGING_WEBHOOK_URL,
-      `New event created: "${event.event.name}" (${event.start_at})`,
-      "Luma Event - Created"
-    );
+    await sendDiscordInfo({
+      webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+      message: `New event created: "${event.event.name}" (${event.start_at})`,
+      title: "Luma Event - Created",
+    });
 
     try {
       await sendDiscordNewEventAlert(env.DISCORD_EVENTS_WEBHOOK_URL, event);

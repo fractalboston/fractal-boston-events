@@ -13,14 +13,16 @@ export type ApiErrorResponse = {
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 export function sendSuccess<T>(data: T): NextResponse<ApiResponse<T>> {
+  const body: ApiSuccessResponse<T> = { success: true, data };
   return addCorsHeaders(
-    NextResponse.json({ success: true, data }, { status: 200 })
+    NextResponse.json(body, { status: 200 }) as NextResponse<ApiResponse<T>>
   );
 }
 
 export function sendCreated<T>(data: T): NextResponse<ApiResponse<T>> {
+  const body: ApiSuccessResponse<T> = { success: true, data };
   return addCorsHeaders(
-    NextResponse.json({ success: true, data }, { status: 201 })
+    NextResponse.json(body, { status: 201 }) as NextResponse<ApiResponse<T>>
   );
 }
 
@@ -28,8 +30,11 @@ export function sendError(
   status: number,
   message: string
 ): NextResponse<ApiErrorResponse> {
+  const body: ApiErrorResponse = { success: false, error: message };
   return addCorsHeaders(
-    NextResponse.json({ success: false, error: message }, { status })
+    NextResponse.json(body, {
+      status,
+    })
   );
 }
 
@@ -59,7 +64,7 @@ export function sendInternalError(
   return sendError(500, message);
 }
 
-function getCorsHeaders(): HeadersInit {
+function getCorsHeaders(): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": "https://fractal.boston",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -68,7 +73,7 @@ function getCorsHeaders(): HeadersInit {
   };
 }
 
-export function addCorsHeaders(response: NextResponse): NextResponse {
+export function addCorsHeaders<T>(response: NextResponse<T>): NextResponse<T> {
   const headers = getCorsHeaders();
   for (const [key, value] of Object.entries(headers)) {
     response.headers.set(key, value);

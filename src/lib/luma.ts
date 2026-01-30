@@ -60,21 +60,20 @@ async function fetchEventsPage(
 }
 
 export async function fetchUpcomingEvents(
-  calendarId: string
+  calendarId: string,
+  asOfDate?: Date
 ): Promise<LumaEvent[]> {
-  const now = new Date();
-  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const windowStart = asOfDate ?? new Date();
+  const windowEnd = new Date(windowStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const allEvents: LumaEvent[] = [];
   const seenEventIds = new Set<string>();
 
-  // Helper to add events and track duplicates, filtering to next week
   const addEvents = (events: LumaEvent[]): void => {
     for (const event of events) {
       if (!seenEventIds.has(event.api_id)) {
         const eventStart = new Date(event.start_at);
-        // Only include events within the next week
-        if (eventStart >= now && eventStart <= nextWeek) {
+        if (eventStart >= windowStart && eventStart <= windowEnd) {
           seenEventIds.add(event.api_id);
           allEvents.push(event);
         }
@@ -101,16 +100,19 @@ export async function fetchUpcomingEvents(
 /**
  * Gets the set of events that should be reported via email or Discord.
  * This is the single source of truth for determining which events to notify about.
- * Returns events within the next 7 days.
+ * Returns events within the next 7 days from the given date (or from now if omitted).
  *
  * IMPORTANT: Both Discord weekly summaries and email weekly digests use this function
  * to ensure they show the same events. The weekly cron job calls this once and passes
  * the same events array to both Discord and email functions.
+ *
+ * @param asOfDate - When provided, the 7-day window is calculated from this date (e.g. for previewing "as if email went out on this date").
  */
 export async function getReportableEvents(
-  calendarId: string
+  calendarId: string,
+  asOfDate?: Date
 ): Promise<LumaEvent[]> {
-  return fetchUpcomingEvents(calendarId);
+  return fetchUpcomingEvents(calendarId, asOfDate);
 }
 
 export function parseLumaSubscriberWebhook(

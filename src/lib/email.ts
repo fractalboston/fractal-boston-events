@@ -1,8 +1,41 @@
 import { Resend } from "resend";
+import {
+  sendDiscordEmailLog as sendDiscordEmailLogImpl,
+  sendDiscordInfo as sendDiscordInfoImpl,
+} from "@/lib/discord";
 import { env } from "@/lib/env";
-import { sendDiscordEmailLog } from "@/lib/discord";
 import { getReportableEvents } from "@/lib/luma";
 import type { LumaEvent } from "@/lib/luma";
+
+type SendDiscordEmailLogFn = ({
+  webhookUrl,
+  emailType,
+  recipientCount,
+  enabled,
+}: {
+  webhookUrl: string;
+  emailType: "verification" | "welcome" | "weekly" | "new-event";
+  recipientCount: number;
+  enabled: boolean;
+}) => Promise<void>;
+
+type SendDiscordInfoFn = ({
+  webhookUrl,
+  message,
+  title,
+  color,
+}: {
+  webhookUrl: string;
+  message: string;
+  title?: string;
+  color?: number;
+}) => Promise<void>;
+
+const sendDiscordEmailLog: SendDiscordEmailLogFn =
+  sendDiscordEmailLogImpl as SendDiscordEmailLogFn;
+
+const sendDiscordInfo: SendDiscordInfoFn =
+  sendDiscordInfoImpl as SendDiscordInfoFn;
 
 let resendClient: Resend | null = null;
 
@@ -31,7 +64,7 @@ function formatEventsPlainText(events: LumaEvent[]): string {
   const eventItems = events
     .map(
       (event) =>
-        `<p>${event.event.name}<br>${formatEventDate(event.start_at)}<br><a href="${event.event.url}">${event.event.url}</a></p>`
+        `<p><a href="https://lu.ma/${event.event.url}">${event.event.name}</a><br>${formatEventDate(event.start_at)}</p>`
     )
     .join("");
 
@@ -122,12 +155,12 @@ export async function sendVerificationEmail(
     });
   }
 
-  await sendDiscordEmailLog(
-    env.DISCORD_LOGGING_WEBHOOK_URL,
-    "verification",
-    1,
-    env.EMAIL_ENABLED
-  );
+  await sendDiscordEmailLog({
+    webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+    emailType: "verification",
+    recipientCount: 1,
+    enabled: env.EMAIL_ENABLED,
+  });
 }
 
 export async function sendWelcomeEmail(
@@ -155,12 +188,12 @@ export async function sendWelcomeEmail(
     });
   }
 
-  await sendDiscordEmailLog(
-    env.DISCORD_LOGGING_WEBHOOK_URL,
-    "welcome",
-    1,
-    env.EMAIL_ENABLED
-  );
+  await sendDiscordEmailLog({
+    webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+    emailType: "welcome",
+    recipientCount: 1,
+    enabled: env.EMAIL_ENABLED,
+  });
 }
 
 export async function sendWeeklyDigest(
@@ -192,12 +225,12 @@ export async function sendWeeklyDigest(
   }
 
   if (!skipLogging) {
-    await sendDiscordEmailLog(
-      env.DISCORD_LOGGING_WEBHOOK_URL,
-      "weekly",
-      1,
-      env.EMAIL_ENABLED
-    );
+    await sendDiscordEmailLog({
+      webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+      emailType: "weekly",
+      recipientCount: 1,
+      enabled: env.EMAIL_ENABLED,
+    });
   }
 }
 
@@ -232,12 +265,12 @@ export async function sendNewEventAlert(
   }
 
   if (!skipLogging) {
-    await sendDiscordEmailLog(
-      env.DISCORD_LOGGING_WEBHOOK_URL,
-      "new-event",
-      1,
-      env.EMAIL_ENABLED
-    );
+    await sendDiscordEmailLog({
+      webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+      emailType: "new-event",
+      recipientCount: 1,
+      enabled: env.EMAIL_ENABLED,
+    });
   }
 }
 
@@ -291,31 +324,69 @@ export async function sendBatchEmails(
 
   // Log batch email operation to Discord (log once for the entire batch)
   const emailType = type === "weekly" ? "weekly" : "new-event";
-  await sendDiscordEmailLog(
-    discordWebhookUrl ?? env.DISCORD_LOGGING_WEBHOOK_URL,
+  const webhookUrl: string =
+    discordWebhookUrl ?? env.DISCORD_LOGGING_WEBHOOK_URL;
+  const emailEnabled: boolean = env.EMAIL_ENABLED;
+  await sendDiscordEmailLog({
+    webhookUrl,
     emailType,
-    success,
-    env.EMAIL_ENABLED
-  );
+    recipientCount: success,
+    enabled: emailEnabled,
+  });
 
   return { success, failed, errors };
 }
 
-export async function sendTestEmail(email: string): Promise<void> {
-  const events = await getReportableEvents(env.LUMA_CALENDAR_ID);
+export type EmailContent = {
+  from: string;
+  subject: string;
+  html: string;
+};
+
+export function getEmailContent(
+  events: LumaEvent[],
+  isTest: boolean
+): EmailContent {
   const eventsText = formatEventsPlainText(events);
+  const footer = `
+  ---<br>
+  links: <a href="https://fractal.boston">fractal.boston</a> | <a href="https://fractal.boston/calendar">/calendar</a> | <a href="https://fractal.boston/discord">/discord</a>
+  `.trim();
+  const html = `
+    <p>Here's what's coming up this week:</p>
+    ${eventsText}
+    <p>
+    ${footer}
+    </p>
+  `;
+  return {
+    from: "Fractal Events <events@fractal.boston>",
+    subject: `${isTest ? "[TEST] " : ""} Upcoming Fractal Events`,
+    html,
+  };
+}
+
+export async function sendTestEmail(
+  email: string,
+  asOfDate?: Date
+): Promise<void> {
+  const events = await getReportableEvents(
+    env.LUMA_CALENDAR_ID,
+    asOfDate ?? new Date()
+  );
+  const { from, subject, html } = getEmailContent(events, true);
 
   const resend = getResend();
   await resend.emails.send({
-    from: "Fractal Events <events@fractal.boston>",
+    from,
     to: email,
-    subject: "Test Email from Fractal Events",
-    html: `
-      <p>Hey,</p>
-      <p>This is a test email from the Fractal Events notification system.</p>
-      <p>Here are the upcoming events:</p>
-      ${eventsText}
-      <p>If you received this email, the email system is working correctly!</p>
-    `,
+    subject,
+    html,
+  });
+
+  await sendDiscordInfo({
+    webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+    message: `Test email sent to **${email}** (subject: ${subject})`,
+    color: 0x3b82f6,
   });
 }

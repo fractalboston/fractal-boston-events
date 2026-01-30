@@ -47,11 +47,11 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     if (existing.status === "unsubscribed") {
-      await sendDiscordInfo(
-        env.DISCORD_LOGGING_WEBHOOK_URL,
-        "Unsubscribe attempt for already unsubscribed email",
-        "Unsubscribe - Already Unsubscribed"
-      );
+      await sendDiscordInfo({
+        webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+        message: "Unsubscribe attempt for already unsubscribed email",
+        title: "Unsubscribe - Already Unsubscribed",
+      });
       return sendSuccess<UnsubscribeResponse>({
         message: "Already unsubscribed",
         email: existing.email,
@@ -64,11 +64,11 @@ export async function POST(request: Request): Promise<Response> {
       return sendNotFound("Token not found");
     }
 
-    await sendDiscordInfo(
-      env.DISCORD_LOGGING_WEBHOOK_URL,
-      "Successfully unsubscribed",
-      "Unsubscribe - Success"
-    );
+    await sendDiscordInfo({
+      webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+      message: "Successfully unsubscribed",
+      title: "Unsubscribe - Success",
+    });
 
     return sendSuccess<UnsubscribeResponse>({
       message: "Successfully unsubscribed",

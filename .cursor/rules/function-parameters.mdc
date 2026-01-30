@@ -1,0 +1,57 @@
+---
+description: Use destructured object parameters when function params are numerous or unclear
+globs: **/*.ts
+alwaysApply: true
+---
+
+# Function Parameters: Prefer Object Params
+
+When defining functions, **use a single destructured object parameter** instead of multiple positional parameters when any of the following apply. **Inline the params type** in the function signature (don't extract a separate type unless it's reused elsewhere):
+
+- The function has **more than three parameters**
+- **Parameter order is confusing** (e.g. callers might mix up similar types)
+- The **number of parameters is variable** or many are optional
+- It's **not obvious** what each argument is from the function name alone
+
+Use positional parameters only when the call site is very clear (e.g. `log(message)` or `parseInt(str, radix)`).
+
+## Examples
+
+```typescript
+// ❌ BAD - four positional params, order is easy to mix up
+function sendDiscordInfo(
+  webhookUrl: string,
+  message: string,
+  title?: string,
+  color?: number
+): Promise<void> {}
+
+// ✅ GOOD - single object param with inline type, callers can specify in any order
+function sendDiscordInfo({ 
+  webhookUrl, 
+  message, 
+  title, 
+  color 
+}: {
+  webhookUrl: string;
+  message: string;
+  title?: string;
+  color?: number;
+}): Promise<void> {
+  // ...
+}
+
+// Call site - clear and order-independent
+await sendDiscordInfo({
+  webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+  message: "Done",
+  title: "Success",
+  color: 0x10b981,
+});
+```
+
+```typescript
+// ✅ OK - few params, obvious from name
+function formatEventDate(dateString: string): string {}
+function getReportableEvents(calendarId: string, asOfDate?: Date): Promise<LumaEvent[]> {}
+```

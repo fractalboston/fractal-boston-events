@@ -35,11 +35,11 @@ export async function POST(request: Request): Promise<Response> {
     const existing = await getSubscriberByEmail(email);
 
     if (existing !== undefined) {
-      await sendDiscordInfo(
-        env.DISCORD_LOGGING_WEBHOOK_URL,
-        "Luma subscriber webhook: subscriber already exists",
-        "Luma Subscriber - Already Exists"
-      );
+      await sendDiscordInfo({
+        webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+        message: "Luma subscriber webhook: subscriber already exists",
+        title: "Luma Subscriber - Already Exists",
+      });
       return sendSuccess<WebhookResponse>({
         message: "Subscriber already exists",
       });
@@ -51,11 +51,11 @@ export async function POST(request: Request): Promise<Response> {
       status: "verified",
     });
 
-    await sendDiscordInfo(
-      env.DISCORD_LOGGING_WEBHOOK_URL,
-      "New Luma subscriber added",
-      "Luma Subscriber - Added"
-    );
+    await sendDiscordInfo({
+      webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+      message: "New Luma subscriber added",
+      title: "Luma Subscriber - Added",
+    });
 
     try {
       const events = await getReportableEvents(env.LUMA_CALENDAR_ID);

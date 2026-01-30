@@ -49,11 +49,11 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     if (existing.status === "verified") {
-      await sendDiscordInfo(
-        env.DISCORD_LOGGING_WEBHOOK_URL,
-        "Verification attempt for already verified email",
-        "Verify - Already Verified"
-      );
+      await sendDiscordInfo({
+        webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+        message: "Verification attempt for already verified email",
+        title: "Verify - Already Verified",
+      });
       return sendSuccess<VerifyResponse>({
         message: "Already verified",
         email: existing.email,
@@ -70,11 +70,11 @@ export async function POST(request: Request): Promise<Response> {
       return sendNotFound("Token not found or already verified");
     }
 
-    await sendDiscordInfo(
-      env.DISCORD_LOGGING_WEBHOOK_URL,
-      "Email verified successfully",
-      "Verify - Success"
-    );
+    await sendDiscordInfo({
+      webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+      message: "Email verified successfully",
+      title: "Verify - Success",
+    });
 
     try {
       const events = await getReportableEvents(env.LUMA_CALENDAR_ID);

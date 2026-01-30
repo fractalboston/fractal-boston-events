@@ -70,3 +70,9 @@
 - [ ] Test subscriber import scripts (both Luma and Substack) - scripts created, need API endpoints (manual testing required)
 - [ ] Test that all Discord logging works correctly (manual testing required)
 - [x] Verify email links point to correct external URLs (fractal.boston/verify?token=xxx, fractal.boston/unsubscribe?token=xxx) - verified in code
+
+
+## Later:
+
+- [ ] spice up the email a bit. get the current weather and have the agent summarize it into a oneliner. add a joke. maybe a oneliner about local news. announce any birthdays? etc
+- [ ] add some images or emoji
