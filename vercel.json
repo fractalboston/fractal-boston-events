@@ -1,13 +1,20 @@
 {
   "crons": [
     {
-      "path": "/api/cron/weekly",
-      "schedule": "0 13 * * 5"
+      "path": "/api/cron/email-weekly",
+      "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/cron/discord-weekly",
+      "schedule": "0 13 * * 1"
     }
   ],
   "functions": {
-    "src/app/api/cron/weekly/route.ts": {
+    "src/app/api/cron/email-weekly/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/discord-weekly/route.ts": {
+      "maxDuration": 60
     },
     "src/app/api/webhooks/luma/event/route.ts": {
       "maxDuration": 300

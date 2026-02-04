@@ -1,10 +1,6 @@
 import { sendInternalError, sendSuccess } from "@/lib/api-response";
 import { validateCronSecret } from "@/lib/auth";
-import {
-  sendDiscordEmailJobStats,
-  sendDiscordError,
-  sendDiscordWeeklySummary,
-} from "@/lib/discord";
+import { sendDiscordEmailJobStats, sendDiscordError } from "@/lib/discord";
 import { sendBatchEmails } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
@@ -24,26 +20,9 @@ export async function GET(): Promise<Response> {
   }
 
   try {
-    const {
-      LUMA_CALENDAR_ID,
-      DISCORD_EVENTS_WEBHOOK_URL,
-      DISCORD_LOGGING_WEBHOOK_URL,
-      DISCORD_MOD_ROLE_ID,
-      APP_URL,
-    } = env;
+    const { LUMA_CALENDAR_ID, DISCORD_LOGGING_WEBHOOK_URL, APP_URL } = env;
 
     const events = await getReportableEvents(LUMA_CALENDAR_ID);
-
-    try {
-      await sendDiscordWeeklySummary(
-        DISCORD_EVENTS_WEBHOOK_URL,
-        events,
-        DISCORD_MOD_ROLE_ID
-      );
-    } catch (discordError) {
-      console.error("Failed to post to Discord:", discordError);
-    }
-
     const subscribers = await getAllVerifiedSubscribers();
 
     const { success, failed } = await sendBatchEmails(
@@ -70,24 +49,24 @@ export async function GET(): Promise<Response> {
     }
 
     return sendSuccess<CronResponse>({
-      message: "Weekly digest sent",
+      message: "Email weekly digest sent",
       eventsCount: events.length,
       emailsSent: success,
       emailsFailed: failed,
     });
   } catch (error) {
-    console.error("Weekly cron error:", error);
+    console.error("Email weekly cron error:", error);
 
     try {
       await sendDiscordError(
         env.DISCORD_LOGGING_WEBHOOK_URL,
         error instanceof Error ? error : new Error(String(error)),
-        "Weekly cron job error"
+        "Email weekly cron job error"
       );
     } catch (discordError) {
       console.error("Failed to log error to Discord:", discordError);
     }
 
-    return sendInternalError("Failed to run weekly digest");
+    return sendInternalError("Failed to run email weekly digest");
   }
 }

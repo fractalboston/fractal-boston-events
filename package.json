@@ -12,7 +12,7 @@
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx}\"",
     "check:types": "tsc --noEmit",
     "test": "vitest run",
-    "check": "yarn format:check &&  yarn lint && yarn check:types && yarn test",
+    "check": "yarn format:check && yarn lint && yarn check:types && yarn test",
     "migrate": "tsx src/db/migrate.ts",
     "db:test": "tsx scripts/test-db-connection.ts",
     "email:test": "tsx scripts/send-test-email.ts"

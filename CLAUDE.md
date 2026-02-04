@@ -1,4 +1,4 @@
-# fb-events - Fractal Boston Events Notification System
+# Fractal Boston Events Notification System
 
 ## Overview
 
@@ -29,7 +29,8 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 │  • POST /api/webhooks/luma/event      - new event created      │
 │                                                                 │
 │  Cron:                                                          │
-│  • GET /api/cron/weekly     - Saturdays 8am EST                │
+│  • GET /api/cron/email-weekly   - Saturdays 8am EST (email only) │
+│  • GET /api/cron/discord-weekly - Mondays 8am EST (Discord only)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -85,17 +86,7 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 
 ### Database Schema
 
-```sql
-subscribers (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email       VARCHAR(255) UNIQUE NOT NULL,
-  token       UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
-  status      VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending, verified, unsubscribed
-  source      VARCHAR(20) NOT NULL DEFAULT 'form',     -- form, luma
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-)
-```
+See `src/db/index.ts` for the schema.
 
 ### API Response Format
 
@@ -109,35 +100,13 @@ All endpoints return consistent JSON:
 { "success": false, "error": "message" }
 ```
 
-### Cron Schedule
+### Cron Jobs
 
-```
-0 13 * * 6 = Every Saturday at 13:00 UTC = 8:00 AM EST
-```
-
-Vercel cron uses UTC, so 8am EST = 13:00 UTC (accounting for EST = UTC-5).
-
-**Note**: Long-running endpoints (cron jobs, webhooks) have `maxDuration: 300` seconds configured in `vercel.json` to handle large batch operations.
+Configured in `vercel.json`.
 
 ## Environment Variables
 
 See `.env.example` for detailed documentation on all environment variables, including:
-- Where to obtain each value
-- Format requirements
-- Usage context
-
-### Key Variables
-
-| Variable                       | Required | Purpose                                    |
-| ------------------------------ | -------- | ------------------------------------------ |
-| `DISCORD_EVENTS_WEBHOOK_URL`   | Yes      | Discord webhook for event notifications    |
-| `DISCORD_LOGGING_WEBHOOK_URL`  | Yes      | Discord webhook for errors & metrics       |
-| `RESEND_API_KEY`               | Yes      | Email service                              |
-| `POSTGRES_URL`                 | Yes      | Postgres connection                        |
-| `SUBSCRIBE_API_KEY`            | Yes      | API security                               |
-| `APP_URL`                      | Yes      | Base URL for email links                   |
-
-**Note**: The two Discord webhooks can point to the same channel or different channels depending on your notification preferences.
 
 ## Luma Webhook Setup
 
@@ -247,47 +216,3 @@ const response = await fetch('https://fb-events.vercel.app/api/subscribe', {
 - **Database**: Supabase free tier supports thousands of subscribers
 - **Monitoring**: System warns in Discord when approaching 75% of Resend monthly limit
 - **If scaling beyond free tier**: Consider Amazon SES ($0.10/1k emails)
-
-## File Structure
-
-```
-fb-events/
-├── src/
-│   ├── db/
-│   │   ├── index.ts        # Kysely database connection
-│   │   └── migrate.ts      # Migration script
-│   ├── lib/
-│   │   ├── api-response.ts # Response helpers
-│   │   ├── auth.ts         # Authentication middleware
-│   │   ├── discord.ts      # Discord webhook client
-│   │   ├── email.ts        # Resend email client
-│   │   ├── env.ts          # Environment validation
-│   │   ├── luma.ts         # Luma API client
-│   │   └── subscribers.ts  # Database operations
-│   └── pages/
-│       ├── api/
-│       │   ├── cron/
-│       │   │   └── weekly.ts
-│       │   ├── webhooks/
-│       │   │   └── luma/
-│       │   │       ├── event.ts
-│       │   │       └── subscriber.ts
-│       │   ├── health.ts
-│       │   ├── subscribe.ts
-│       │   ├── unsubscribe.ts
-│       │   └── verify.ts
-│       ├── _app.tsx
-│       └── index.tsx
-├── .env.example
-├── .eslintrc.json
-├── .gitignore
-├── .prettierrc
-├── clause.md               # This file
-├── next.config.js
-├── package.json
-├── postcss.config.js
-├── tailwind.config.ts
-├── tsconfig.json
-├── vercel.json
-└── vitest.config.ts
-```

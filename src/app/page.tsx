@@ -16,7 +16,7 @@ export default function Home(): ReactElement {
       </p>
       {showTestEmail && (
         <p>
-          <Link href="/test-email">Test Email</Link>
+          <Link href="/test-email">Testing</Link>
         </p>
       )}
     </div>
