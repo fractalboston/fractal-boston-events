@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { HOMEPAGE_URL } from "@/lib/constants";
+import { isDevelopment } from "@/lib/env";
 
 export const subscribeBodySchema = z.union([
   z.object({ email: z.email() }),
@@ -97,8 +98,9 @@ export function sendInternalError(
 }
 
 function getCorsHeaders(): Record<string, string> {
+  const allowAllOrigins = isDevelopment();
   return {
-    "Access-Control-Allow-Origin": HOMEPAGE_URL,
+    "Access-Control-Allow-Origin": allowAllOrigins ? "*" : HOMEPAGE_URL,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Api-Key",
     "Access-Control-Max-Age": "86400",
