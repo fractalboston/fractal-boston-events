@@ -1,5 +1,36 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { HOMEPAGE_URL } from "@/lib/constants";
+
+export const subscribeBodySchema = z.union([
+  z.object({ email: z.email() }),
+  z.object({ token: z.string() }),
+]);
+
+export const verifyBodySchema = z.object({
+  token: z.string(),
+});
+
+export const unsubscribeBodySchema = z.object({
+  token: z.string(),
+});
+
+export type SubscribeBody = z.infer<typeof subscribeBodySchema>;
+export type VerifyBody = z.infer<typeof verifyBodySchema>;
+export type UnsubscribeBody = z.infer<typeof unsubscribeBodySchema>;
+
+export type SubscribeResponse = {
+  message: string;
+};
+
+export type VerifyResponse = {
+  message: string;
+  email: string;
+};
+
+export type UnsubscribeResponse = {
+  message: string;
+};
 
 export type ApiSuccessResponse<T> = {
   success: true;

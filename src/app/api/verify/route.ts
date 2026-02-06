@@ -1,25 +1,17 @@
-import { z } from "zod";
 import {
+  type VerifyResponse,
   handleOptionsRequest,
   sendBadRequest,
   sendInternalError,
   sendNotFound,
   sendSuccess,
+  verifyBodySchema,
 } from "@/lib/api-response";
 import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendWelcomeEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 import { getSubscriberByToken, verifySubscriber } from "@/lib/subscribers";
-
-const verifySchema = z.object({
-  token: z.string(),
-});
-
-type VerifyResponse = {
-  message: string;
-  email: string;
-};
 
 export function OPTIONS(): Response {
   return handleOptionsRequest();
@@ -33,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
     return sendBadRequest("Invalid JSON body");
   }
 
-  const parsed = verifySchema.safeParse(body);
+  const parsed = verifyBodySchema.safeParse(body);
 
   if (!parsed.success) {
     return sendBadRequest("Invalid token");

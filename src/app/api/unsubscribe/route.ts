@@ -1,22 +1,15 @@
-import { z } from "zod";
 import {
+  type UnsubscribeResponse,
   handleOptionsRequest,
   sendBadRequest,
   sendInternalError,
   sendNotFound,
   sendSuccess,
+  unsubscribeBodySchema,
 } from "@/lib/api-response";
 import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { getSubscriberByToken, unsubscribe } from "@/lib/subscribers";
-
-const unsubscribeSchema = z.object({
-  token: z.string(),
-});
-
-type UnsubscribeResponse = {
-  message: string;
-};
 
 export function OPTIONS(): Response {
   return handleOptionsRequest();
@@ -30,7 +23,7 @@ export async function POST(request: Request): Promise<Response> {
     return sendBadRequest("Invalid JSON body");
   }
 
-  const parsed = unsubscribeSchema.safeParse(body);
+  const parsed = unsubscribeBodySchema.safeParse(body);
 
   if (!parsed.success) {
     return sendBadRequest("Invalid token");

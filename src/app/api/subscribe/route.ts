@@ -1,10 +1,12 @@
-import { z } from "zod";
 import {
+  type SubscribeResponse,
   handleOptionsRequest,
   sendBadRequest,
   sendCreated,
   sendInternalError,
+  sendNotFound,
   sendSuccess,
+  subscribeBodySchema,
 } from "@/lib/api-response";
 import { validateApiKey } from "@/lib/auth";
 import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
@@ -13,16 +15,10 @@ import { env } from "@/lib/env";
 import {
   createSubscriber,
   getSubscriberByEmail,
+  getSubscriberByToken,
   resubscribe,
+  verifySubscriber,
 } from "@/lib/subscribers";
-
-const subscribeSchema = z.object({
-  email: z.email(),
-});
-
-type SubscribeResponse = {
-  message: string;
-};
 
 export function OPTIONS(): Response {
   return handleOptionsRequest();
@@ -41,16 +37,62 @@ export async function POST(request: Request): Promise<Response> {
     return sendBadRequest("Invalid JSON body");
   }
 
-  const parsed = subscribeSchema.safeParse(body);
+  const parsed = subscribeBodySchema.safeParse(body);
 
   if (!parsed.success) {
-    return sendBadRequest("Invalid email address");
+    return sendBadRequest("Provide either a valid email or a token");
   }
 
-  const { email } = parsed.data;
   const appUrl = env.APP_URL;
 
   try {
+    if ("token" in parsed.data) {
+      const { token } = parsed.data;
+      const existing = await getSubscriberByToken(token);
+      if (existing === undefined) {
+        return sendNotFound("Token not found");
+      }
+      if (existing.status === "verified") {
+        await sendDiscordInfo({
+          webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+          message: "Subscription attempt for already verified email",
+          title: "Subscribe - Already Verified",
+        });
+        return sendSuccess<SubscribeResponse>({
+          message: "Already subscribed",
+        });
+      }
+      if (existing.status === "unsubscribed") {
+        const resubscribed = await resubscribe(existing.email);
+        if (resubscribed !== undefined) {
+          await sendDiscordInfo({
+            webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+            message: "Resubscribed successfully",
+            title: "Subscribe - Resubscribed",
+          });
+          return sendSuccess<SubscribeResponse>({
+            message: "Resubscribed successfully",
+          });
+        }
+      }
+      if (existing.status === "pending") {
+        const verified = await verifySubscriber(token);
+        if (verified !== undefined) {
+          await sendDiscordInfo({
+            webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+            message: "Subscriber verified via token",
+            title: "Subscribe - Verified via Token",
+          });
+          return sendSuccess<SubscribeResponse>({
+            message: "Subscription confirmed",
+          });
+        }
+      }
+      return sendInternalError("Failed to process subscription");
+    }
+
+    const { email } = parsed.data;
+
     // Check if already subscribed
     const existing = await getSubscriberByEmail(email);
 
