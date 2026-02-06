@@ -13,7 +13,7 @@ cp .env.example .env
 # Edit .env with your values
 
 # Run database migrations
-yarn db:migrate
+yarn migrate
 
 # Start development server
 yarn dev

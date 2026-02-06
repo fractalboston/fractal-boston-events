@@ -1,18 +1,24 @@
-import { Kysely, PostgresDialect } from "kysely";
+import { Generated, Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 import { env } from "@/lib/env";
+
+// Utility type to convert all Generated<T> to T
+type Degenerate<T> = {
+  [K in keyof T]: T[K] extends Generated<infer U> ? U : T[K];
+};
 
 export type SubscriberStatus = "pending" | "verified" | "unsubscribed";
 
 export type SubscribersTable = {
-  id: string;
+  id: Generated<string>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
   email: string;
-  token: string;
+  token: Generated<string>;
   status: SubscriberStatus;
-  source: "form" | "luma";
-  created_at: Date;
-  updated_at: Date;
+  source: "form" | "luma" | "substack" | "manual";
 };
+export type Subscriber = Degenerate<SubscribersTable>;
 
 export type Database = {
   subscribers: SubscribersTable;

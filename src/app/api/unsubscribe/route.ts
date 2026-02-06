@@ -11,15 +11,14 @@ import { env } from "@/lib/env";
 import { getSubscriberByToken, unsubscribe } from "@/lib/subscribers";
 
 const unsubscribeSchema = z.object({
-  token: z.uuid(),
+  token: z.string(),
 });
 
 type UnsubscribeResponse = {
   message: string;
-  email: string;
 };
 
-export async function OPTIONS(): Promise<Response> {
+export function OPTIONS(): Response {
   return handleOptionsRequest();
 }
 
@@ -42,7 +41,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const existing = await getSubscriberByToken(token);
 
-    if (existing === undefined) {
+    if (!existing) {
       return sendNotFound("Token not found");
     }
 
@@ -54,7 +53,6 @@ export async function POST(request: Request): Promise<Response> {
       });
       return sendSuccess<UnsubscribeResponse>({
         message: "Already unsubscribed",
-        email: existing.email,
       });
     }
 
@@ -72,7 +70,6 @@ export async function POST(request: Request): Promise<Response> {
 
     return sendSuccess<UnsubscribeResponse>({
       message: "Successfully unsubscribed",
-      email: subscriber.email,
     });
   } catch (error) {
     console.error("Unsubscribe error:", error);

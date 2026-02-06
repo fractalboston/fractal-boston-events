@@ -162,7 +162,7 @@ Both webhooks need the `X-Luma-Signature` header set to your `LUMA_WEBHOOK_SECRE
 yarn
 
 # Run migrations
-yarn db:migrate
+yarn migrate
 
 # Start dev server (with Turbopack)
 yarn dev

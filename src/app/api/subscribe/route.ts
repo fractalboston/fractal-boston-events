@@ -22,10 +22,9 @@ const subscribeSchema = z.object({
 
 type SubscribeResponse = {
   message: string;
-  email: string;
 };
 
-export async function OPTIONS(): Promise<Response> {
+export function OPTIONS(): Response {
   return handleOptionsRequest();
 }
 
@@ -64,7 +63,6 @@ export async function POST(request: Request): Promise<Response> {
         });
         return sendSuccess<SubscribeResponse>({
           message: "Already subscribed",
-          email: existing.email,
         });
       }
 
@@ -78,7 +76,6 @@ export async function POST(request: Request): Promise<Response> {
           });
           return sendSuccess<SubscribeResponse>({
             message: "Resubscribed successfully",
-            email: resubscribed.email,
           });
         }
       }
@@ -92,7 +89,6 @@ export async function POST(request: Request): Promise<Response> {
         });
         return sendSuccess<SubscribeResponse>({
           message: "Verification email resent",
-          email: existing.email,
         });
       }
     }
@@ -102,6 +98,19 @@ export async function POST(request: Request): Promise<Response> {
       source: "form",
       status: "pending",
     });
+
+    if (subscriber === undefined) {
+      const existing = await getSubscriberByEmail(email);
+      if (existing?.status === "pending") {
+        await sendVerificationEmail(email, existing.token, appUrl);
+        return sendSuccess<SubscribeResponse>({
+          message: "Verification email resent",
+        });
+      }
+      return sendSuccess<SubscribeResponse>({
+        message: "Already subscribed",
+      });
+    }
 
     await sendVerificationEmail(email, subscriber.token, appUrl);
 
@@ -113,7 +122,6 @@ export async function POST(request: Request): Promise<Response> {
 
     return sendCreated<SubscribeResponse>({
       message: "Verification email sent",
-      email: subscriber.email,
     });
   } catch (error) {
     console.error("Subscribe error:", error);

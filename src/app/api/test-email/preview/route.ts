@@ -4,7 +4,7 @@ import { env, isDevelopment } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 
 function parseAsOfDate(dateStr: string | null): Date | null {
-  if (!dateStr || dateStr.trim() === "") return null;
+  if (dateStr === null || dateStr.trim() === "") return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
   if (!match) return null;
   const [, y, m, d] = match;

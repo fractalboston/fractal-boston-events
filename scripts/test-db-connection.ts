@@ -1,6 +1,6 @@
 import "dotenv/config";
 import env from "env-var";
-import { db } from "@/db";
+import { db } from "@/db/db";
 
 async function testConnection(): Promise<void> {
   try {

@@ -9,7 +9,7 @@ import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendWelcomeEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents, parseLumaSubscriberWebhook } from "@/lib/luma";
-import { createSubscriber, getSubscriberByEmail } from "@/lib/subscribers";
+import { createSubscriber } from "@/lib/subscribers";
 
 type WebhookResponse = {
   message: string;
@@ -32,9 +32,13 @@ export async function POST(request: Request): Promise<Response> {
     const payload = parseLumaSubscriberWebhook(body);
     const email = payload.data.user.email;
 
-    const existing = await getSubscriberByEmail(email);
+    const subscriber = await createSubscriber({
+      email,
+      source: "luma",
+      status: "verified",
+    });
 
-    if (existing !== undefined) {
+    if (subscriber === undefined) {
       await sendDiscordInfo({
         webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
         message: "Luma subscriber webhook: subscriber already exists",
@@ -44,12 +48,6 @@ export async function POST(request: Request): Promise<Response> {
         message: "Subscriber already exists",
       });
     }
-
-    const subscriber = await createSubscriber({
-      email,
-      source: "luma",
-      status: "verified",
-    });
 
     await sendDiscordInfo({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,

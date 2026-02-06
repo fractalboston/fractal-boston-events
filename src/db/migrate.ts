@@ -10,7 +10,7 @@ import {
 } from "kysely";
 import { Pool } from "pg";
 import { fileURLToPath } from "url";
-import type { Database } from "./index";
+import type { Database } from "./db";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -1,17 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { isEventWithinNextWeek } from "@/lib/luma";
-import type { LumaEvent } from "@/lib/luma";
 
-function createMockEvent(startAt: Date): LumaEvent {
+function createMockEvent(startAt: Date): { start_at: string } {
   return {
-    api_id: "test-id",
-    name: "Test Event",
     start_at: startAt.toISOString(),
-    end_at: new Date(startAt.getTime() + 2 * 60 * 60 * 1000).toISOString(),
-    url: "https://lu.ma/test",
-    cover_url: null,
-    description: null,
-    geo_address_json: null,
   };
 }
 

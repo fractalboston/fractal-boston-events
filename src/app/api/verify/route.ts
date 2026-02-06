@@ -13,7 +13,7 @@ import { getReportableEvents } from "@/lib/luma";
 import { getSubscriberByToken, verifySubscriber } from "@/lib/subscribers";
 
 const verifySchema = z.object({
-  token: z.uuid(),
+  token: z.string(),
 });
 
 type VerifyResponse = {
@@ -21,7 +21,7 @@ type VerifyResponse = {
   email: string;
 };
 
-export async function OPTIONS(): Promise<Response> {
+export function OPTIONS(): Response {
   return handleOptionsRequest();
 }
 

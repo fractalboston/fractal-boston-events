@@ -14,8 +14,10 @@
     "test": "vitest run",
     "check": "yarn format:check && yarn lint && yarn check:types && yarn test",
     "migrate": "tsx src/db/migrate.ts",
+    "migrate:down": "tsx src/db/migrate.ts --down",
     "db:test": "tsx scripts/test-db-connection.ts",
-    "email:test": "tsx scripts/send-test-email.ts"
+    "email:test": "tsx scripts/send-test-email.ts",
+    "import:subscribers": "tsx scripts/importSubscriberCsv.ts"
   },
   "dependencies": {
     "env-var": "^7.5.0",
@@ -26,7 +28,6 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^4.0.1",
-    "uuid": "^10.0.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {
@@ -37,7 +38,6 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
     "autoprefixer": "^10.4.20",

@@ -15,9 +15,15 @@ export default function Home(): ReactElement {
         <Link href="/events-preview">Events Preview</Link>
       </p>
       {showTestEmail && (
-        <p>
-          <Link href="/test-email">Testing</Link>
-        </p>
+        <>
+          <p>
+            <Link href="/test-email">Testing</Link>
+          </p>
+          <p>
+            <Link href="/subscribers">Subscribers</Link> — search and edit
+            subscriber records (dev only).
+          </p>
+        </>
       )}
     </div>
   );
