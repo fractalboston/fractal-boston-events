@@ -29,7 +29,7 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 │  • POST /api/webhooks/luma/event      - new event created      │
 │                                                                 │
 │  Cron:                                                          │
-│  • GET /api/cron/email-weekly   - Saturdays 8am EST (email only) │
+│  • GET /api/cron/email-weekly   - Daily 8am EST (email only)      │
 │  • GET /api/cron/discord-weekly - Mondays 8am EST (Discord only)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -147,7 +147,7 @@ Both webhooks need the `X-Luma-Signature` header set to your `LUMA_WEBHOOK_SECRE
 
 **Logging Channel** (`DISCORD_LOGGING_WEBHOOK_URL`):
 - Error logging from all API endpoints with stack traces
-- Email job statistics after weekly digest:
+- Email job statistics after daily digest:
   - Emails sent/failed count
   - Events included
   - Total subscriber count

@@ -4,7 +4,9 @@ import { sendDiscordEmailJobStats, sendDiscordError } from "@/lib/discord";
 import { sendBatchEmails } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
-import { getAllVerifiedSubscribers } from "@/lib/subscribers";
+import { getSubscriberById } from "@/lib/subscribers";
+
+const DAILY_DIGEST_SUBSCRIBER_ID = "019c30e3-8436-1d4d-f354-0aeb1d1e9bf3";
 
 type CronResponse = {
   message: string;
@@ -23,7 +25,10 @@ export async function GET(): Promise<Response> {
     const { LUMA_CALENDAR_ID, DISCORD_LOGGING_WEBHOOK_URL, APP_URL } = env;
 
     const events = await getReportableEvents(LUMA_CALENDAR_ID);
-    const subscribers = await getAllVerifiedSubscribers();
+    const subscriber = await getSubscriberById(DAILY_DIGEST_SUBSCRIBER_ID);
+    const subscribers = subscriber
+      ? [{ email: subscriber.email, token: subscriber.token }]
+      : [];
 
     const { success, failed } = await sendBatchEmails(
       subscribers,

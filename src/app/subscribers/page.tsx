@@ -32,6 +32,12 @@ type CreateResponse = {
   error?: string;
 };
 
+type DeleteResponse = {
+  success: boolean;
+  data?: { deleted: boolean };
+  error?: string;
+};
+
 const SOURCES: Subscriber["source"][] = ["form", "luma", "substack", "manual"];
 const STATUSES: Subscriber["status"][] = [
   "pending",
@@ -55,12 +61,14 @@ export default function SubscribersPage(): ReactElement {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const runSearch = useCallback(async (q: string): Promise<void> => {
     setSearchLoading(true);
     setMessage(null);
     try {
-      const url = `/api/test-email/subscribers?email=${encodeURIComponent(q)}`;
+      const url = `/api/subscribers?email=${encodeURIComponent(q)}`;
       const response = await fetch(url);
       const data = (await response.json()) as SearchResponse;
       if (data.success && data.data?.subscribers !== undefined) {
@@ -107,7 +115,7 @@ export default function SubscribersPage(): ReactElement {
     setCreateLoading(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/test-email/subscribers/create", {
+      const response = await fetch("/api/subscribers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,8 +160,8 @@ export default function SubscribersPage(): ReactElement {
     setUpdateLoading(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/test-email/subscribers", {
-        method: "POST",
+      const response = await fetch("/api/subscribers", {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: selected.id,
@@ -178,6 +186,40 @@ export default function SubscribersPage(): ReactElement {
       setMessage({ type: "error", text: err.message });
     } finally {
       setUpdateLoading(false);
+    }
+  }
+
+  async function handleDelete(): Promise<void> {
+    if (selected === null) return;
+    setDeleteLoading(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/subscribers", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selected.id }),
+      });
+      const data = (await response.json()) as DeleteResponse;
+      if (data.success) {
+        const deletedEmail = selected.email;
+        setSelected(null);
+        setShowDeleteConfirm(false);
+        setMessage({
+          type: "success",
+          text: `Subscriber ${deletedEmail} deleted.`,
+        });
+        void runSearch(query);
+      } else {
+        setMessage({
+          type: "error",
+          text: data.error ?? "Delete failed",
+        });
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -282,6 +324,66 @@ export default function SubscribersPage(): ReactElement {
       fontFamily: "monospace",
       fontSize: "12px",
       wordBreak: "break-all" as const,
+    },
+    detailFooter: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: "16px",
+      gap: "12px",
+    },
+    deleteButton: (disabled: boolean): CSSProperties => ({
+      backgroundColor: "transparent",
+      color: "#dc2626",
+      padding: "8px 16px",
+      fontSize: "14px",
+      border: "1px solid #dc2626",
+      borderRadius: "6px",
+      cursor: disabled ? "not-allowed" : "pointer",
+      fontWeight: "500",
+    }),
+    modalOverlay: {
+      position: "fixed" as const,
+      inset: 0,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+    },
+    modalContent: {
+      backgroundColor: "#fff",
+      borderRadius: "8px",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      padding: "24px",
+      maxWidth: "360px",
+      width: "90%",
+    },
+    modalTitle: {
+      fontSize: "16px",
+      fontWeight: "600",
+      color: "#111",
+      marginBottom: "8px",
+    },
+    modalText: {
+      fontSize: "14px",
+      color: "#6b7280",
+      marginBottom: "20px",
+    },
+    modalActions: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: "12px",
+    },
+    cancelButton: {
+      backgroundColor: "#f3f4f6",
+      color: "#374151",
+      padding: "8px 16px",
+      fontSize: "14px",
+      border: "1px solid #e5e7eb",
+      borderRadius: "6px",
+      cursor: "pointer",
+      fontWeight: "500",
     },
   };
 
@@ -463,16 +565,72 @@ export default function SubscribersPage(): ReactElement {
                 ))}
               </select>
             </div>
-            <button
-              type="button"
-              disabled={updateLoading}
-              onClick={() => {
-                void handleUpdate();
-              }}
-              style={style.button(updateLoading)}
-            >
-              {updateLoading ? "Saving…" : "Save changes"}
-            </button>
+            <div style={style.detailFooter}>
+              <button
+                type="button"
+                disabled={updateLoading}
+                onClick={() => {
+                  void handleUpdate();
+                }}
+                style={style.button(updateLoading)}
+              >
+                {updateLoading ? "Saving…" : "Save changes"}
+              </button>
+              <button
+                type="button"
+                disabled={deleteLoading}
+                onClick={() => {
+                  setShowDeleteConfirm(true);
+                }}
+                style={style.deleteButton(deleteLoading)}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && selected !== null && (
+        <div
+          style={style.modalOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+        >
+          <div style={style.modalContent}>
+            <h2 id="delete-modal-title" style={style.modalTitle}>
+              Delete subscriber?
+            </h2>
+            <p style={style.modalText}>
+              This will permanently remove {selected.email} from the list. This
+              cannot be undone.
+            </p>
+            <div style={style.modalActions}>
+              <button
+                type="button"
+                disabled={deleteLoading}
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                }}
+                style={style.cancelButton}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteLoading}
+                onClick={() => {
+                  void handleDelete();
+                }}
+                style={{
+                  ...style.button(deleteLoading),
+                  backgroundColor: "#dc2626",
+                }}
+              >
+                {deleteLoading ? "Deleting…" : "Delete"}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -42,6 +42,16 @@ export async function getSubscriberByEmail(
     .executeTakeFirst();
 }
 
+export async function getSubscriberById(
+  id: string
+): Promise<Subscriber | undefined> {
+  return db
+    .selectFrom("subscribers")
+    .selectAll()
+    .where("id", "=", id)
+    .executeTakeFirst();
+}
+
 export async function getSubscriberByToken(
   token: string
 ): Promise<Subscriber | undefined> {
@@ -148,4 +158,12 @@ export async function updateSubscriber(
     .returningAll()
     .executeTakeFirst();
   return result;
+}
+
+export async function deleteSubscriber(id: string): Promise<boolean> {
+  const result = await db
+    .deleteFrom("subscribers")
+    .where("id", "=", id)
+    .executeTakeFirst();
+  return Number(result.numDeletedRows) > 0;
 }
