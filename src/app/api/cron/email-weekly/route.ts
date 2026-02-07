@@ -42,6 +42,9 @@ export async function GET(): Promise<Response> {
       DISCORD_LOGGING_WEBHOOK_URL
     );
 
+    console.log(`Sent ${String(success)} emails`);
+    console.log(`Failed to send ${String(failed)} emails`);
+
     try {
       const estimatedMonthlyUsage = subscribers.length * 4;
       await sendDiscordEmailJobStats(DISCORD_LOGGING_WEBHOOK_URL, {

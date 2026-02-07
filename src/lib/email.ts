@@ -29,6 +29,7 @@ async function sendEmailIfEnabled({
   html: string;
 }): Promise<void> {
   if (!env.EMAIL_ENABLED) {
+    console.warn(`Trying to email ${to} but EMAIL_ENABLED is false`);
     return;
   }
 
@@ -112,7 +113,7 @@ export async function sendWeeklyDigest(
   const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
 
   const content = `
-    <h1 style="font-size: 24px; margin-bottom: 16px;">This Week at Fractal 📅</h1>
+    <h1 style="font-size: 24px; margin-bottom: 16px;">This Week at Fractal</h1>
     ${generateEventsHtml(events)}
     <p style="margin-top: 24px;">
       <a href="https://lu.ma/fractalboston" style="color: #2563eb;">View all events on Luma →</a>
