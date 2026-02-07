@@ -13,6 +13,7 @@ export type Env = {
   EMAIL_ENABLED: boolean;
   SUBSTACK_API_KEY?: string;
   CRON_SECRET?: string;
+  ADMIN_API_KEY?: string;
   VERCEL: string | undefined;
 };
 
@@ -35,6 +36,7 @@ const config: Env = {
   EMAIL_ENABLED: env.get("EMAIL_ENABLED").default("false").asBool(),
   SUBSTACK_API_KEY: env.get("SUBSTACK_API_KEY").asString(),
   CRON_SECRET: env.get("CRON_SECRET").asString(),
+  ADMIN_API_KEY: env.get("ADMIN_API_KEY").asString(),
   VERCEL: env.get("VERCEL").asString(),
 };
 

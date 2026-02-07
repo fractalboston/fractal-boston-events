@@ -22,6 +22,15 @@ export async function validateCronSecret(): Promise<NextResponse<ApiErrorRespons
   }
 
   const headersList = await headers();
+
+  const adminKey = headersList.get("x-admin-api-key") ?? "";
+  if (adminKey) {
+    if (adminKey === env.ADMIN_API_KEY) {
+      return null;
+    }
+    return sendUnauthorized("Invalid admin API key");
+  }
+
   const authHeader = headersList.get("authorization");
 
   if (

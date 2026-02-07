@@ -25,10 +25,13 @@ export async function GET(): Promise<Response> {
     const { LUMA_CALENDAR_ID, DISCORD_LOGGING_WEBHOOK_URL, APP_URL } = env;
 
     const events = await getReportableEvents(LUMA_CALENDAR_ID);
+    console.log(`Found ${String(events.length)} events`);
     const subscriber = await getSubscriberById(DAILY_DIGEST_SUBSCRIBER_ID);
     const subscribers = subscriber
       ? [{ email: subscriber.email, token: subscriber.token }]
       : [];
+
+    console.log(`Found ${String(subscribers.length)} subscribers`);
 
     const { success, failed } = await sendBatchEmails(
       subscribers,
