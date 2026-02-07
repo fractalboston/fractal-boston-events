@@ -24,11 +24,20 @@ export type Database = {
   subscribers: SubscribersTable;
 };
 
+// Strip sslmode from URL so Pool's ssl config (rejectUnauthorized: false) is used.
+// Otherwise pg may apply strict verification from sslmode=require/verify-full and reject Supabase's cert chain.
+function connectionStringWithoutSslMode(url: string): string {
+  const parsed = new URL(url);
+  parsed.searchParams.delete("sslmode");
+  parsed.searchParams.delete("sslrootcert");
+  return parsed.toString();
+}
+
 // Connection pooler configured for Supabase Transaction Mode (port 6543)
 // Transaction mode is required for serverless/Vercel deployments
 // Transaction mode does not support prepared statements, which Kysely handles automatically
 const pool = new Pool({
-  connectionString: env.POSTGRES_URL,
+  connectionString: connectionStringWithoutSslMode(env.POSTGRES_URL),
   ssl: { rejectUnauthorized: false },
   // Serverless-optimized pool settings for Supabase Transaction Mode
   max: 15, // Maximum number of clients in the pool
