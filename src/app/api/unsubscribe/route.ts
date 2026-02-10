@@ -62,7 +62,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     return sendSuccess<UnsubscribeResponse>({
-      message: "Successfully unsubscribed",
+      message: "We're sorry to see you go.",
     });
   } catch (error) {
     console.error("Unsubscribe error:", error);
