@@ -4,9 +4,13 @@ import { sendDiscordEmailJobStats, sendDiscordError } from "@/lib/discord";
 import { sendBatchEmails } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
-import { getSubscriberById } from "@/lib/subscribers";
+import { getVerifiedSubscribersByIds } from "@/lib/subscribers";
 
-const DAILY_DIGEST_SUBSCRIBER_ID = "019c30e3-8436-1d4d-f354-0aeb1d1e9bf3";
+const testingSubscribers = [
+  "019c30e3-8436-1d4d-f354-0aeb1d1e9bf3",
+  "019c30e1-25ce-bc93-cc63-857e0919edf7",
+  "019c30e1-434c-3a90-fe46-5eea2af2d482",
+];
 
 type CronResponse = {
   message: string;
@@ -26,10 +30,39 @@ export async function GET(): Promise<Response> {
 
     const events = await getReportableEvents(LUMA_CALENDAR_ID);
     console.log(`Found ${String(events.length)} events`);
-    const subscriber = await getSubscriberById(DAILY_DIGEST_SUBSCRIBER_ID);
-    const subscribers = subscriber
-      ? [{ email: subscriber.email, token: subscriber.token }]
-      : [];
+
+    // Fetch all verified subscribers from testingSubscribers array
+    const verifiedSubscribers =
+      await getVerifiedSubscribersByIds(testingSubscribers);
+    const subscribers = verifiedSubscribers.map((subscriber) => ({
+      email: subscriber.email,
+      token: subscriber.token,
+    }));
+
+    // Skip sending emails if there are no events
+    if (events.length === 0) {
+      console.warn("No events found, skipping email send");
+
+      try {
+        await sendDiscordEmailJobStats(DISCORD_LOGGING_WEBHOOK_URL, {
+          emailsSent: 0,
+          emailsFailed: 0,
+          eventsCount: 0,
+          subscribersCount: subscribers.length,
+          resendMonthlyLimit: 3000,
+          resendMonthlyUsed: subscribers.length * 4,
+        });
+      } catch (discordError) {
+        console.error("Failed to send stats to Discord:", discordError);
+      }
+
+      return sendSuccess<CronResponse>({
+        message: "Email weekly digest skipped - no events found",
+        eventsCount: 0,
+        emailsSent: 0,
+        emailsFailed: 0,
+      });
+    }
 
     console.log(`Found ${String(subscribers.length)} subscribers`);
 

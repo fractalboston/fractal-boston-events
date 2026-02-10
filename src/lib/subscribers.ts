@@ -99,6 +99,23 @@ export async function getAllVerifiedSubscribers(): Promise<Subscriber[]> {
   return results;
 }
 
+export async function getVerifiedSubscribersByIds(
+  ids: string[]
+): Promise<Subscriber[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const results = await db
+    .selectFrom("subscribers")
+    .selectAll()
+    .where("id", "in", ids)
+    .where("status", "=", "verified")
+    .execute();
+
+  return results;
+}
+
 export async function resubscribe(
   email: string
 ): Promise<Subscriber | undefined> {

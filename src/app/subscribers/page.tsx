@@ -390,8 +390,8 @@ export default function SubscribersPage(): ReactElement {
 
   return (
     <div style={style.page}>
-      <Link href="/test-email" style={style.backLink}>
-        ← Testing
+      <Link href="/" style={style.backLink}>
+        ← Home
       </Link>
       <h1 style={style.h1}>Subscribers</h1>
       <p style={style.description}>

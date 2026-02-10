@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { BRAND_COLOR } from "@/lib/constants";
@@ -157,6 +158,18 @@ export default function TestEmailPage(): ReactElement {
         minHeight: "100vh",
       }}
     >
+      <Link
+        href="/"
+        style={{
+          display: "inline-block",
+          marginBottom: "16px",
+          fontSize: "14px",
+          color: BRAND_COLOR,
+          textDecoration: "none",
+        }}
+      >
+        ← Home
+      </Link>
       <h1 style={{ fontSize: "22px", marginBottom: "8px", color: "#111" }}>
         Send Test Email
       </h1>

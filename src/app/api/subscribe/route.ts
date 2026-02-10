@@ -1,3 +1,4 @@
+import { db } from "@/db/db";
 import {
   type SubscribeResponse,
   handleOptionsRequest,
@@ -15,7 +16,6 @@ import {
   createSubscriber,
   getSubscriberByEmail,
   getSubscriberByToken,
-  resubscribe,
   verifySubscriber,
 } from "@/lib/subscribers";
 
@@ -24,7 +24,6 @@ export function OPTIONS(): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
-
   let body: unknown;
   try {
     body = await request.json();
@@ -58,15 +57,24 @@ export async function POST(request: Request): Promise<Response> {
         });
       }
       if (existing.status === "unsubscribed") {
-        const resubscribed = await resubscribe(existing.email);
-        if (resubscribed !== undefined) {
+        // Set status back to pending and resend verification email
+        const updated = await db
+          .updateTable("subscribers")
+          .set({ status: "pending" })
+          .where("email", "=", existing.email.toLowerCase())
+          .where("status", "=", "unsubscribed")
+          .returningAll()
+          .executeTakeFirst();
+
+        if (updated !== undefined) {
+          await sendVerificationEmail(existing.email, existing.token, appUrl);
           await sendDiscordInfo({
             webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-            message: "Resubscribed successfully",
-            title: "Subscribe - Resubscribed",
+            message: "Verification email resent to unsubscribed address",
+            title: "Subscribe - Verification Resent",
           });
           return sendSuccess<SubscribeResponse>({
-            message: "Resubscribed successfully",
+            message: "Verification email sent",
           });
         }
       }
@@ -104,15 +112,24 @@ export async function POST(request: Request): Promise<Response> {
       }
 
       if (existing.status === "unsubscribed") {
-        const resubscribed = await resubscribe(email);
-        if (resubscribed !== undefined) {
+        // Set status back to pending and resend verification email
+        const updated = await db
+          .updateTable("subscribers")
+          .set({ status: "pending" })
+          .where("email", "=", existing.email.toLowerCase())
+          .where("status", "=", "unsubscribed")
+          .returningAll()
+          .executeTakeFirst();
+
+        if (updated !== undefined) {
+          await sendVerificationEmail(existing.email, existing.token, appUrl);
           await sendDiscordInfo({
             webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-            message: "Resubscribed successfully",
-            title: "Subscribe - Resubscribed",
+            message: "Verification email resent to unsubscribed address",
+            title: "Subscribe - Verification Resent",
           });
           return sendSuccess<SubscribeResponse>({
-            message: "Resubscribed successfully",
+            message: "Verification email sent",
           });
         }
       }
