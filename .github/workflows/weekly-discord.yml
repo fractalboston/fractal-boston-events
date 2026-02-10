@@ -1,0 +1,45 @@
+name: Weekly Discord
+
+on:
+  schedule:
+    # Discord weekly cron - runs every Monday at 13:01 UTC (matches Vercel schedule: "0 13 * * 1")
+    - cron: '0 13 * * 1'
+  # Allow manual triggering for testing
+  workflow_dispatch:
+
+jobs:
+  discord-weekly:
+    name: Discord Weekly Summary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Discord Weekly Endpoint
+        env:
+          VERCEL_URL: ${{ vars.VERCEL_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+        run: |
+          if [ -z "$VERCEL_URL" ]; then
+            echo "Error: VERCEL_URL variable is not set"
+            exit 1
+          fi
+          if [ -z "$ADMIN_API_KEY" ]; then
+            echo "Error: ADMIN_API_KEY secret is not set"
+            exit 1
+          fi
+          
+          echo "Calling Discord weekly endpoint..."
+          response=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "x-admin-api-key: $ADMIN_API_KEY" \
+            "$VERCEL_URL/api/cron/discord-weekly")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Response HTTP Status: $http_code"
+          echo "Response Body: $body"
+          
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✓ Discord weekly cron completed successfully"
+          else
+            echo "✗ Discord weekly cron failed with HTTP $http_code"
+            exit 1
+          fi
