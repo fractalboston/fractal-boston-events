@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { EMAIL_FROM } from "@/lib/constants";
+import { BRAND_COLOR, EMAIL_FROM } from "@/lib/constants";
 import { sendDiscordEmailLog, sendDiscordInfo } from "@/lib/discord";
 import {
   buildEmailBody,
@@ -52,11 +52,11 @@ export async function sendVerificationEmail(
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">Verify your subscription</h1>
     <p>Thanks for subscribing to Fractal Events! Please click the button below to confirm your email address.</p>
-    <a href="${verifyUrl}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
+    <a href="${verifyUrl}" style="display: inline-block; background-color: ${BRAND_COLOR}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
       Verify Email
     </a>
     <p style="margin-top: 24px; font-size: 14px; color: #666;">
-      Or copy this link: ${verifyUrl}
+      Or copy this link: <a href="${verifyUrl}" style="color: ${BRAND_COLOR};">${verifyUrl}</a>
     </p>
   `;
 
@@ -83,7 +83,7 @@ export async function sendWelcomeEmail(
   const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
 
   const content = `
-    <h1 style="font-size: 24px; margin-bottom: 16px;">Welcome to Fractal Events! 🎉</h1>
+    <h1 style="font-size: 24px; margin-bottom: 16px;">Welcome to Fractal! 🎉</h1>
     <p>You're now subscribed to weekly event updates from Fractal Boston.</p>
     <h2 style="font-size: 18px; margin-top: 24px;">Upcoming Events This Week</h2>
     ${generateEventsHtml(events)}
@@ -91,7 +91,7 @@ export async function sendWelcomeEmail(
 
   await sendEmailIfEnabled({
     to: email,
-    subject: "Welcome to Fractal Events - Here's what's coming up!",
+    subject: "Welcome to Fractal, here's what's coming up",
     html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
   });
 
@@ -116,7 +116,7 @@ export async function sendWeeklyDigest(
     <h1 style="font-size: 24px; margin-bottom: 16px;">This Week at Fractal</h1>
     ${generateEventsHtml(events)}
     <p style="margin-top: 24px;">
-      <a href="https://lu.ma/fractalboston" style="color: #2563eb;">View all events on Luma →</a>
+      <a href="https://lu.ma/fractalboston" style="color: ${BRAND_COLOR};">View all events on Luma →</a>
     </p>
   `;
 
@@ -151,7 +151,7 @@ export async function sendNewEventAlert(
     <p>A new event was just added:</p>
     ${generateEventsHtml([event])}
     <p>
-      <a href="${getLumaEventUrl(event.event.url)}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+      <a href="${getLumaEventUrl(event.event.url)}" style="display: inline-block; background-color: ${BRAND_COLOR}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
         RSVP Now
       </a>
     </p>
@@ -246,7 +246,7 @@ export type EmailContent = {
   html: string;
 };
 
-export function getEmailContent(
+export function getBasicEmailContent(
   events: LumaEvent[],
   isTest: boolean
 ): EmailContent {
@@ -254,6 +254,23 @@ export function getEmailContent(
   const content = `
     <p>Here's what's coming up this week:</p>
     ${eventsText}
+  `;
+  const body = buildEmailBody(content, "#");
+  return {
+    from: EMAIL_FROM,
+    subject: `${isTest ? "[TEST] " : ""} Upcoming Fractal Events`,
+    html: wrapInEmailTemplate(body),
+  };
+}
+
+export function getDetailedEmailContent(
+  events: LumaEvent[],
+  isTest: boolean
+): EmailContent {
+  const detailedEventsHtml = generateEventsHtml(events);
+  const content = `
+    <p>Here's what's coming up this week:</p>
+    ${detailedEventsHtml}
   `;
   const body = buildEmailBody(content, "#");
   return {
@@ -271,7 +288,7 @@ export async function sendTestEmail(
     env.LUMA_CALENDAR_ID,
     asOfDate ?? new Date()
   );
-  const { from, subject, html } = getEmailContent(events, true);
+  const { from, subject, html } = getBasicEmailContent(events, true);
 
   const resend = getResend();
   await resend.emails.send({

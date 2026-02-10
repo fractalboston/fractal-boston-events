@@ -8,7 +8,6 @@ import {
   sendSuccess,
   subscribeBodySchema,
 } from "@/lib/api-response";
-import { validateApiKey } from "@/lib/auth";
 import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendVerificationEmail } from "@/lib/email";
 import { env } from "@/lib/env";
@@ -25,10 +24,6 @@ export function OPTIONS(): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const authError = await validateApiKey();
-  if (authError !== null) {
-    return authError;
-  }
 
   let body: unknown;
   try {

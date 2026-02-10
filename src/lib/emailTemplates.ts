@@ -1,4 +1,9 @@
-import { CALENDAR_URL, DISCORD_URL, HOMEPAGE_URL } from "@/lib/constants";
+import {
+  BRAND_COLOR,
+  CALENDAR_URL,
+  DISCORD_URL,
+  HOMEPAGE_URL,
+} from "@/lib/constants";
 import type { LumaEvent } from "@/lib/luma";
 import { getLumaEventUrl } from "@/lib/urls";
 
@@ -37,18 +42,30 @@ export function generateEventsHtml(events: LumaEvent[]): string {
   }
 
   const eventItems = events
-    .map(
-      (event) => `
-      <div style="margin-bottom: 24px; padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px;">
-        <h3 style="margin: 0 0 8px 0; color: #1a1a1a;">
-          <a href="${getLumaEventUrl(event.event.url)}" style="color: #2563eb; text-decoration: none;">${event.event.name}</a>
-        </h3>
-        <p style="margin: 0; color: #666; font-size: 14px;">
-          📅 ${formatEventDate(event.start_at)}
-        </p>
-      </div>
-    `
-    )
+    .map((event) => {
+      const eventUrl = getLumaEventUrl(event.event.url);
+      return `
+      <a href="${eventUrl}" style="display: block; text-decoration: none; color: inherit;">
+        <div style="margin-bottom: 24px; padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="width: 64px; padding-right: 16px; vertical-align: top;">
+                ${event.event.cover_url ? `<div style="width: 64px; height: 64px; background-color: #f0f0f0; border-radius: 4px; overflow: hidden; position: relative;"><img src="${event.event.cover_url}" alt="${event.event.name}" width="64" height="64" style="width: 64px; height: 64px; object-fit: cover; border-radius: 4px; display: block; max-width: 100%;" /></div>` : '<div style="width: 64px; height: 64px; background-color: #f0f0f0; border-radius: 4px;"></div>'}
+              </td>
+              <td style="vertical-align: top;">
+                <h3 style="margin: 0 0 8px 0; color: #1a1a1a;">
+                  <span style="color: ${BRAND_COLOR};">${event.event.name}</span>
+                </h3>
+                <p style="margin: 0; color: #666; font-size: 14px;">
+                  📅 ${formatEventDate(event.start_at)}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </a>
+    `;
+    })
     .join("");
 
   return `
@@ -63,16 +80,16 @@ export function buildEmailBody(
   unsubscribeUrl?: string
 ): string {
   const footer = `
-  ---<br>
-  links: <a href="${HOMEPAGE_URL}">fractal.boston</a> | <a href="${CALENDAR_URL}">/calendar</a> | <a href="${DISCORD_URL}">/discord</a>
+  <p style="font-size: 15px;">
+    ---<br/>
+    <a href="${HOMEPAGE_URL}" style="color: ${BRAND_COLOR};">fractal.boston</a> | <a href="${CALENDAR_URL}" style="color: ${BRAND_COLOR};">/calendar</a> | <a href="${DISCORD_URL}" style="color: ${BRAND_COLOR};">/discord</a>
+  </p>
   `.trim();
   const href = unsubscribeUrl ?? "#";
-  const unsubscribeLine = `<p style="font-size: 12px;"><a href="${href}" style="font-size: 12px;">Unsubscribe</a> from these emails.</p>`;
+  const unsubscribeLine = `<p style="font-size: 12px;"><a href="${href}" style="font-size: 12px; color: ${BRAND_COLOR};">Unsubscribe</a> from these emails.</p>`;
   return `
     ${content}
-    <p>
     ${footer}
-    </p>
     ${unsubscribeLine}
   `;
 }

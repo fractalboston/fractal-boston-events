@@ -1,5 +1,9 @@
 import { sendInternalError, sendSuccess } from "@/lib/api-response";
-import { type EmailContent, getEmailContent } from "@/lib/email";
+import {
+  type EmailContent,
+  getBasicEmailContent,
+  getDetailedEmailContent,
+} from "@/lib/email";
 import { env, isDevelopment } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 
@@ -27,9 +31,13 @@ export async function GET(request: Request): Promise<Response> {
     const asOfDate = parseAsOfDate(dateParam) ?? new Date();
 
     const events = await getReportableEvents(env.LUMA_CALENDAR_ID, asOfDate);
-    const content: EmailContent = getEmailContent(events, true);
+    const simpleContent: EmailContent = getBasicEmailContent(events, true);
+    const detailedContent: EmailContent = getDetailedEmailContent(events, true);
 
-    return sendSuccess(content);
+    return sendSuccess({
+      simple: simpleContent,
+      detailed: detailedContent,
+    });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     console.error("Test email preview error:", err);

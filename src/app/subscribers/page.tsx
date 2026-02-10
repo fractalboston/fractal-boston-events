@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
+import { BRAND_COLOR } from "@/lib/constants";
 
 type Subscriber = {
   id: string;
@@ -236,7 +237,7 @@ export default function SubscribersPage(): ReactElement {
       display: "inline-block",
       marginBottom: "16px",
       fontSize: "14px",
-      color: "#2563eb",
+      color: BRAND_COLOR,
       textDecoration: "none",
     },
     h1: { fontSize: "22px", marginBottom: "8px", color: "#111" },
@@ -265,7 +266,7 @@ export default function SubscribersPage(): ReactElement {
       color: "#374151",
     },
     button: (disabled: boolean): CSSProperties => ({
-      backgroundColor: disabled ? "#9ca3af" : "#2563eb",
+      backgroundColor: disabled ? "#9ca3af" : BRAND_COLOR,
       color: "white",
       padding: "8px 16px",
       fontSize: "14px",
