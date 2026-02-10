@@ -1777,6 +1777,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@vercel/config@npm:^0.0.28":
+  version: 0.0.28
+  resolution: "@vercel/config@npm:0.0.28"
+  dependencies:
+    pretty-cache-header: "npm:^1.0.0"
+    zod: "npm:^3.22.0"
+  bin:
+    config: dist/cli.js
+  checksum: 10c0/5378ac38166b4ad67ed085e48cd6274155c6ceac794970cec1ba10f7a9f36a30d971073366ee1982642e85fcf4c4d1f886c39f13b05b0097e9fc3f0ed4c05e38
+  languageName: node
+  linkType: hard
+
 "@vitest/expect@npm:2.1.9":
   version: 2.1.9
   resolution: "@vitest/expect@npm:2.1.9"
@@ -3447,6 +3459,7 @@ __metadata:
     "@types/react-dom": "npm:^19.0.0"
     "@typescript-eslint/eslint-plugin": "npm:^8.17.0"
     "@typescript-eslint/parser": "npm:^8.17.0"
+    "@vercel/config": "npm:^0.0.28"
     autoprefixer: "npm:^10.4.20"
     dotenv: "npm:^17.2.3"
     env-var: "npm:^7.5.0"
@@ -5377,6 +5390,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"pretty-cache-header@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "pretty-cache-header@npm:1.0.0"
+  dependencies:
+    timestring: "npm:^6.0.0"
+  checksum: 10c0/e9129e6a6cd6bee308ac1cc347f6fc536d4f2fa4b2b7048af0ef2ac22880cbfda0834b6c32946437a75dc1004f95c1ebf4c583e4c69fa819958c92c59370673e
+  languageName: node
+  linkType: hard
+
 "proc-log@npm:^6.0.0":
   version: 6.1.0
   resolution: "proc-log@npm:6.1.0"
@@ -6300,6 +6322,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"timestring@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "timestring@npm:6.0.0"
+  checksum: 10c0/753688c0f6ebdec5af6a77a01ad85b5fd868d04d2d1e7510bb23b2554236ea400f008b0b358a54f148c2aa0cf517494e786f20b61d8a7477d7fa4438f33bf84e
+  languageName: node
+  linkType: hard
+
 "tinybench@npm:^2.9.0":
   version: 2.9.0
   resolution: "tinybench@npm:2.9.0"
@@ -6908,6 +6937,13 @@ __metadata:
   peerDependencies:
     zod: ^3.25.0 || ^4.0.0
   checksum: 10c0/0ccfec48c46de1be440b719cd02044d4abb89ed0e14c13e637cd55bf29102f67ccdba373f25def0fc7130e5f15025be4d557a7edcc95d5a3811599aade689e1b
+  languageName: node
+  linkType: hard
+
+"zod@npm:^3.22.0":
+  version: 3.25.76
+  resolution: "zod@npm:3.25.76"
+  checksum: 10c0/5718ec35e3c40b600316c5b4c5e4976f7fee68151bc8f8d90ec18a469be9571f072e1bbaace10f1e85cf8892ea12d90821b200e980ab46916a6166a4260a983c
   languageName: node
   linkType: hard
 
