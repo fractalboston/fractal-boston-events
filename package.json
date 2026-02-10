@@ -57,7 +57,8 @@
     "vitest": "^2.1.6"
   },
   "resolutions": {
-    "tar": "^7.0.0"
+    "tar": "^7.0.0",
+    "glob": "^11.0.0"
   },
   "packageManager": "yarn@4.12.0"
 }
