@@ -58,7 +58,7 @@
   },
   "resolutions": {
     "tar": "^7.0.0",
-    "glob": "^11.0.0"
+    "glob": "^13.0.0"
   },
   "packageManager": "yarn@4.12.0"
 }
