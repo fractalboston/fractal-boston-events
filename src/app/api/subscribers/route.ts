@@ -30,15 +30,53 @@ const updateBodySchema = z.object({
 
 type UpdateBody = z.infer<typeof updateBodySchema>;
 
+const listQuerySchema = z.object({
+  email: z.string().optional(),
+  q: z.string().optional(),
+  sort: z.enum(["newest", "alphabetical"]).optional(),
+  status: z.enum(["pending", "verified", "unsubscribed"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
 export async function GET(request: Request): Promise<Response> {
   if (!isDevelopment()) {
     return new Response(null, { status: 404 });
   }
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get("email") ?? searchParams.get("q") ?? "";
-    const subscribers = await searchSubscribersByEmail(query);
-    return sendSuccess({ subscribers });
+    const parsed = listQuerySchema.safeParse({
+      email: searchParams.get("email") ?? undefined,
+      q: searchParams.get("q") ?? undefined,
+      sort: searchParams.get("sort") ?? undefined,
+      status: searchParams.get("status") ?? undefined,
+      limit: searchParams.get("limit") ?? undefined,
+      offset: searchParams.get("offset") ?? undefined,
+    });
+    if (!parsed.success) {
+      return sendBadRequest(parsed.error.message);
+    }
+
+    const query = parsed.data.email ?? parsed.data.q ?? "";
+    const sort = parsed.data.sort ?? "newest";
+    const status = parsed.data.status;
+    const limit = parsed.data.limit ?? 50;
+    const offset = parsed.data.offset ?? 0;
+    const { subscribers, hasMore, totalCount } = await searchSubscribersByEmail(
+      {
+        query,
+        sort,
+        status,
+        limit,
+        offset,
+      }
+    );
+    return sendSuccess({
+      subscribers,
+      hasMore,
+      nextOffset: offset + subscribers.length,
+      totalCount,
+    });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     console.error("Subscriber search error:", err);

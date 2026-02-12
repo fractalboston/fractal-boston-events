@@ -330,87 +330,6 @@ export default function TestEmailPage(): ReactElement {
             color: "#6b7280",
           }}
         >
-          Basic email preview
-        </div>
-        {previewLoading ? (
-          <div
-            style={{
-              padding: "40px 20px",
-              textAlign: "center",
-              color: "#6b7280",
-              fontSize: "14px",
-            }}
-          >
-            Loading…
-          </div>
-        ) : previewError != null && previewError !== "" ? (
-          <div
-            style={{
-              padding: "20px",
-              color: "#991b1b",
-              fontSize: "14px",
-            }}
-          >
-            {previewError}
-          </div>
-        ) : preview ? (
-          <>
-            <div
-              style={{
-                padding: "12px 20px",
-                borderBottom: "1px solid #e5e7eb",
-                fontSize: "13px",
-                color: "#374151",
-              }}
-            >
-              <div style={{ marginBottom: "6px" }}>
-                <span style={{ color: "#9ca3af", marginRight: "8px" }}>
-                  From
-                </span>
-                {preview.simple.from}
-              </div>
-              <div>
-                <span style={{ color: "#9ca3af", marginRight: "8px" }}>
-                  Subject
-                </span>
-                {preview.simple.subject}
-              </div>
-            </div>
-            <div
-              style={{
-                fontFamily:
-                  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-                maxWidth: "600px",
-                margin: "0 auto",
-                padding: "20px",
-                color: "#1a1a1a",
-                fontSize: "16px",
-                lineHeight: 1.5,
-              }}
-              dangerouslySetInnerHTML={{ __html: preview.simple.html }}
-            />
-          </>
-        ) : null}
-      </div>
-
-      <div
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: "8px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-          border: "1px solid #e5e7eb",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            padding: "16px 20px",
-            borderBottom: "1px solid #e5e7eb",
-            backgroundColor: "#f9fafb",
-            fontSize: "13px",
-            color: "#6b7280",
-          }}
-        >
           HTML email preview
         </div>
         {previewLoading ? (
@@ -469,6 +388,87 @@ export default function TestEmailPage(): ReactElement {
                 lineHeight: 1.5,
               }}
               dangerouslySetInnerHTML={{ __html: preview.detailed.html }}
+            />
+          </>
+        ) : null}
+      </div>
+
+      <div
+        style={{
+          backgroundColor: "#fff",
+          borderRadius: "8px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          border: "1px solid #e5e7eb",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid #e5e7eb",
+            backgroundColor: "#f9fafb",
+            fontSize: "13px",
+            color: "#6b7280",
+          }}
+        >
+          Basic email preview
+        </div>
+        {previewLoading ? (
+          <div
+            style={{
+              padding: "40px 20px",
+              textAlign: "center",
+              color: "#6b7280",
+              fontSize: "14px",
+            }}
+          >
+            Loading…
+          </div>
+        ) : previewError != null && previewError !== "" ? (
+          <div
+            style={{
+              padding: "20px",
+              color: "#991b1b",
+              fontSize: "14px",
+            }}
+          >
+            {previewError}
+          </div>
+        ) : preview ? (
+          <>
+            <div
+              style={{
+                padding: "12px 20px",
+                borderBottom: "1px solid #e5e7eb",
+                fontSize: "13px",
+                color: "#374151",
+              }}
+            >
+              <div style={{ marginBottom: "6px" }}>
+                <span style={{ color: "#9ca3af", marginRight: "8px" }}>
+                  From
+                </span>
+                {preview.simple.from}
+              </div>
+              <div>
+                <span style={{ color: "#9ca3af", marginRight: "8px" }}>
+                  Subject
+                </span>
+                {preview.simple.subject}
+              </div>
+            </div>
+            <div
+              style={{
+                fontFamily:
+                  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                maxWidth: "600px",
+                margin: "0 auto",
+                padding: "20px",
+                color: "#1a1a1a",
+                fontSize: "16px",
+                lineHeight: 1.5,
+              }}
+              dangerouslySetInnerHTML={{ __html: preview.simple.html }}
             />
           </>
         ) : null}

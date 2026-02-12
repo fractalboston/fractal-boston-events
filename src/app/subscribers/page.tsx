@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { BRAND_COLOR } from "@/lib/constants";
 
@@ -17,7 +17,12 @@ type Subscriber = {
 
 type SearchResponse = {
   success: boolean;
-  data?: { subscribers: Subscriber[] };
+  data?: {
+    subscribers: Subscriber[];
+    hasMore: boolean;
+    nextOffset: number;
+    totalCount: number;
+  };
   error?: string;
 };
 
@@ -45,11 +50,24 @@ const STATUSES: Subscriber["status"][] = [
   "verified",
   "unsubscribed",
 ];
+const SEARCH_DEBOUNCE_MS = 500;
+const PAGE_SIZE = 50;
+
+type SortOption = "newest" | "alphabetical";
+type StatusFilter = "all" | Subscriber["status"];
 
 export default function SubscribersPage(): ReactElement {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [sort, setSort] = useState<SortOption>("newest");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [results, setResults] = useState<Subscriber[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasLoadedResults, setHasLoadedResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [loadMoreLoading, setLoadMoreLoading] = useState(false);
   const [selected, setSelected] = useState<Subscriber | null>(null);
   const [editSource, setEditSource] = useState<Subscriber["source"] | "">("");
   const [editStatus, setEditStatus] = useState<Subscriber["status"] | "">("");
@@ -64,39 +82,170 @@ export default function SubscribersPage(): ReactElement {
   } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const activeSearchControllerRef = useRef<AbortController | null>(null);
 
-  const runSearch = useCallback(async (q: string): Promise<void> => {
-    setSearchLoading(true);
-    setMessage(null);
-    try {
-      const url = `/api/subscribers?email=${encodeURIComponent(q)}`;
-      const response = await fetch(url);
-      const data = (await response.json()) as SearchResponse;
-      if (data.success && data.data?.subscribers !== undefined) {
-        setResults(data.data.subscribers);
-        setSelected(null);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return (): void => {
+      clearTimeout(timeout);
+    };
+  }, [query]);
+
+  const runSearch = useCallback(
+    async ({
+      q,
+      sortBy,
+      status,
+      offset,
+      append,
+    }: {
+      q: string;
+      sortBy: SortOption;
+      status: StatusFilter;
+      offset: number;
+      append: boolean;
+    }): Promise<void> => {
+      if (append) {
+        setLoadMoreLoading(true);
       } else {
-        setResults([]);
-        setMessage({
-          type: "error",
-          text: data.error ?? "Search failed",
-        });
+        setSearchLoading(true);
+        setMessage(null);
       }
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      setResults([]);
-      setMessage({ type: "error", text: err.message });
-    } finally {
-      setSearchLoading(false);
-    }
-  }, []);
 
-  function handleSearchSubmit(
-    e: Parameters<React.SubmitEventHandler<HTMLFormElement>>[0]
-  ): void {
-    e.preventDefault();
-    void runSearch(query);
-  }
+      activeSearchControllerRef.current?.abort();
+      const controller = new AbortController();
+      activeSearchControllerRef.current = controller;
+
+      try {
+        const params = new URLSearchParams();
+        params.set("q", q);
+        params.set("sort", sortBy);
+        params.set("limit", PAGE_SIZE.toString());
+        params.set("offset", offset.toString());
+        if (status !== "all") {
+          params.set("status", status);
+        }
+        const response = await fetch(`/api/subscribers?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as SearchResponse;
+        if (data.success && data.data?.subscribers !== undefined) {
+          const subscribers = data.data.subscribers;
+          setResults((previous) => {
+            if (!append) {
+              return subscribers;
+            }
+            return [...previous, ...subscribers];
+          });
+          setHasMore(data.data.hasMore);
+          setNextOffset(data.data.nextOffset);
+          setTotalCount(data.data.totalCount);
+          if (!append) {
+            setSelected(null);
+          }
+        } else if (!append) {
+          setResults([]);
+          setHasMore(false);
+          setNextOffset(0);
+          setTotalCount(0);
+          setMessage({
+            type: "error",
+            text: data.error ?? "Search failed",
+          });
+        } else {
+          setMessage({
+            type: "error",
+            text: data.error ?? "Failed to load more subscribers",
+          });
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        const err = error instanceof Error ? error : new Error(String(error));
+        if (!append) {
+          setResults([]);
+          setHasMore(false);
+          setNextOffset(0);
+          setTotalCount(0);
+        }
+        setMessage({ type: "error", text: err.message });
+      } finally {
+        if (activeSearchControllerRef.current === controller) {
+          activeSearchControllerRef.current = null;
+          setSearchLoading(false);
+          setLoadMoreLoading(false);
+          setHasLoadedResults(true);
+        }
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    void runSearch({
+      q: debouncedQuery,
+      sortBy: sort,
+      status: statusFilter,
+      offset: 0,
+      append: false,
+    });
+  }, [debouncedQuery, runSearch, sort, statusFilter]);
+
+  const loadMore = useCallback((): void => {
+    if (!hasMore || searchLoading || loadMoreLoading) {
+      return;
+    }
+
+    void runSearch({
+      q: debouncedQuery,
+      sortBy: sort,
+      status: statusFilter,
+      offset: nextOffset,
+      append: true,
+    });
+  }, [
+    debouncedQuery,
+    hasMore,
+    loadMoreLoading,
+    nextOffset,
+    runSearch,
+    searchLoading,
+    sort,
+    statusFilter,
+  ]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (target === null || !hasMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMore();
+        }
+      },
+      { rootMargin: "120px" }
+    );
+
+    observer.observe(target);
+
+    return (): void => {
+      observer.disconnect();
+    };
+  }, [hasMore, loadMore]);
+
+  useEffect(() => {
+    return (): void => {
+      activeSearchControllerRef.current?.abort();
+    };
+  }, []);
 
   function handleSelectSubscriber(s: Subscriber): void {
     setSelected(s);
@@ -135,6 +284,13 @@ export default function SubscribersPage(): ReactElement {
         setSelected(data.data.subscriber);
         setEditSource(data.data.subscriber.source);
         setEditStatus(data.data.subscriber.status);
+        void runSearch({
+          q: debouncedQuery,
+          sortBy: sort,
+          status: statusFilter,
+          offset: 0,
+          append: false,
+        });
       } else {
         setMessage({
           type: "error",
@@ -176,6 +332,13 @@ export default function SubscribersPage(): ReactElement {
         setEditSource(data.data.subscriber.source);
         setEditStatus(data.data.subscriber.status);
         setMessage({ type: "success", text: "Subscriber updated." });
+        void runSearch({
+          q: debouncedQuery,
+          sortBy: sort,
+          status: statusFilter,
+          offset: 0,
+          append: false,
+        });
       } else {
         setMessage({
           type: "error",
@@ -209,7 +372,13 @@ export default function SubscribersPage(): ReactElement {
           type: "success",
           text: `Subscriber ${deletedEmail} deleted.`,
         });
-        void runSearch(query);
+        void runSearch({
+          q: debouncedQuery,
+          sortBy: sort,
+          status: statusFilter,
+          offset: 0,
+          append: false,
+        });
       } else {
         setMessage({
           type: "error",
@@ -395,11 +564,11 @@ export default function SubscribersPage(): ReactElement {
       </Link>
       <h1 style={style.h1}>Subscribers</h1>
       <p style={style.description}>
-        Search by email to find a subscriber. Click a row to view and edit their
-        record.
+        Search updates automatically as you type. Sort results, then scroll to
+        load more subscribers.
       </p>
 
-      <form onSubmit={handleSearchSubmit} style={style.formRow}>
+      <div style={style.formRow}>
         <div>
           <label htmlFor="email-search" style={style.label}>
             Email search
@@ -412,21 +581,46 @@ export default function SubscribersPage(): ReactElement {
               setQuery(e.target.value);
             }}
             placeholder="e.g. user@example.com"
-            disabled={searchLoading}
             style={style.input}
           />
         </div>
-        <button
-          type="submit"
-          disabled={searchLoading}
-          style={{
-            ...style.button(searchLoading),
-            alignSelf: "flex-end",
-          }}
-        >
-          {searchLoading ? "Searching…" : "Search"}
-        </button>
-      </form>
+        <div>
+          <label htmlFor="subscriber-sort" style={style.label}>
+            Sort
+          </label>
+          <select
+            id="subscriber-sort"
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value as SortOption);
+            }}
+            style={{ ...style.input, width: "180px" }}
+          >
+            <option value="newest">Newest first</option>
+            <option value="alphabetical">Alphabetical (A-Z)</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="subscriber-status-filter" style={style.label}>
+            Status
+          </label>
+          <select
+            id="subscriber-status-filter"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as StatusFilter);
+            }}
+            style={{ ...style.input, width: "180px" }}
+          >
+            <option value="all">All statuses</option>
+            {STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       <div style={{ ...style.card, marginBottom: "20px" }}>
         <div style={style.cardHeader}>Add subscriber</div>
@@ -437,12 +631,12 @@ export default function SubscribersPage(): ReactElement {
             }}
             style={{
               display: "flex",
-              flexWrap: "wrap",
+              flexWrap: "nowrap",
               gap: "12px",
               alignItems: "flex-end",
             }}
           >
-            <div>
+            <div style={{ flex: "1.5 1 0", minWidth: 0 }}>
               <label htmlFor="new-email" style={style.label}>
                 Email
               </label>
@@ -456,10 +650,10 @@ export default function SubscribersPage(): ReactElement {
                 placeholder="email@example.com"
                 disabled={createLoading}
                 required
-                style={style.input}
+                style={{ ...style.input, width: "100%" }}
               />
             </div>
-            <div>
+            <div style={{ flex: "1 1 0", minWidth: 0 }}>
               <label htmlFor="new-source" style={style.label}>
                 Source
               </label>
@@ -470,7 +664,7 @@ export default function SubscribersPage(): ReactElement {
                   setNewSource(e.target.value as Subscriber["source"]);
                 }}
                 disabled={createLoading}
-                style={{ ...style.select, marginLeft: 0 }}
+                style={{ ...style.input, width: "100%" }}
               >
                 {SOURCES.map((src) => (
                   <option key={src} value={src}>
@@ -479,7 +673,7 @@ export default function SubscribersPage(): ReactElement {
                 ))}
               </select>
             </div>
-            <div>
+            <div style={{ flex: "1 1 0", minWidth: 0 }}>
               <label htmlFor="new-status" style={style.label}>
                 Status
               </label>
@@ -490,7 +684,7 @@ export default function SubscribersPage(): ReactElement {
                   setNewStatus(e.target.value as Subscriber["status"]);
                 }}
                 disabled={createLoading}
-                style={{ ...style.select, marginLeft: 0 }}
+                style={{ ...style.input, width: "100%" }}
               >
                 {STATUSES.map((st) => (
                   <option key={st} value={st}>
@@ -502,7 +696,7 @@ export default function SubscribersPage(): ReactElement {
             <button
               type="submit"
               disabled={createLoading}
-              style={style.button(createLoading)}
+              style={{ ...style.button(createLoading), flexShrink: 0 }}
             >
               {createLoading ? "Adding…" : "Add"}
             </button>
@@ -639,7 +833,7 @@ export default function SubscribersPage(): ReactElement {
       {results.length > 0 && (
         <div style={style.card}>
           <div style={style.cardHeader}>
-            {results.length} result{results.length !== 1 ? "s" : ""}
+            {totalCount} subscriber{totalCount !== 1 ? "s" : ""}
           </div>
           {results.map((s) => (
             <div
@@ -663,15 +857,30 @@ export default function SubscribersPage(): ReactElement {
               </span>
             </div>
           ))}
+          <div ref={loadMoreRef} style={{ height: "1px" }} />
+          {(loadMoreLoading || hasMore) && (
+            <div
+              style={{
+                padding: "12px 16px",
+                fontSize: "13px",
+                color: "#6b7280",
+                borderTop: "1px solid #e5e7eb",
+              }}
+            >
+              {loadMoreLoading ? "Loading more..." : "Scroll to load more"}
+            </div>
+          )}
         </div>
       )}
 
-      {query.trim() !== "" &&
+      {hasLoadedResults &&
         !searchLoading &&
         results.length === 0 &&
         message === null && (
           <p style={{ fontSize: "14px", color: "#6b7280" }}>
-            No subscribers match &quot;{query}&quot;.
+            {query.trim() === ""
+              ? "No subscribers found."
+              : `No subscribers match "${query.trim()}".`}
           </p>
         )}
     </div>

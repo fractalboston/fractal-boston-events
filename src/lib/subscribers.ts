@@ -130,20 +130,58 @@ export async function resubscribe(
   return result;
 }
 
-export async function searchSubscribersByEmail(
-  query: string
-): Promise<Subscriber[]> {
-  if (query.trim() === "") {
-    return [];
+export async function searchSubscribersByEmail({
+  query,
+  sort,
+  status,
+  limit,
+  offset,
+}: {
+  query: string;
+  sort: "newest" | "alphabetical";
+  status?: SubscriberStatus;
+  limit: number;
+  offset: number;
+}): Promise<{
+  subscribers: Subscriber[];
+  hasMore: boolean;
+  totalCount: number;
+}> {
+  const normalizedQuery = query.trim();
+  const pattern =
+    normalizedQuery === "" ? undefined : `%${escapeForLike(normalizedQuery)}%`;
+
+  let filteredQuery = db.selectFrom("subscribers");
+  if (pattern !== undefined) {
+    filteredQuery = filteredQuery.where(
+      sql<boolean>`email ilike ${pattern} escape '\\'`
+    );
   }
-  const pattern = `%${escapeForLike(query.trim())}%`;
-  return db
-    .selectFrom("subscribers")
-    .selectAll()
-    .where(sql<boolean>`email ilike ${pattern} escape '\\'`)
-    .orderBy("email", "asc")
-    .limit(50)
+  if (status !== undefined) {
+    filteredQuery = filteredQuery.where("status", "=", status);
+  }
+
+  const totalCountRow = await filteredQuery
+    .select(sql<number>`count(*)::int`.as("total_count"))
+    .executeTakeFirstOrThrow();
+
+  let listQuery = filteredQuery.selectAll();
+  if (sort === "alphabetical") {
+    listQuery = listQuery.orderBy("email", "asc").orderBy("created_at", "desc");
+  } else {
+    listQuery = listQuery.orderBy("created_at", "desc").orderBy("email", "asc");
+  }
+
+  const rows = await listQuery
+    .limit(limit + 1)
+    .offset(offset)
     .execute();
+  const hasMore = rows.length > limit;
+  return {
+    subscribers: hasMore ? rows.slice(0, limit) : rows,
+    hasMore,
+    totalCount: totalCountRow.total_count,
+  };
 }
 
 export type UpdateSubscriberInput = {
