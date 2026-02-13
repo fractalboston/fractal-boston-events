@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { readFile } from "fs/promises";
-import { createSubscriber } from "@/lib/subscribers";
+import { getAllVerifiedSubscribers } from "@/lib/subscribers";
 
 /**
  * Parse a CSV line into fields (handles quoted values with commas).
@@ -51,31 +51,24 @@ function isValidEmail(value: string): boolean {
   return value.length > 0 && value.includes("@") && value.includes(".");
 }
 
-/**
- * Create a subscriber from a CSV row.
- * Skips if email already exists; returns whether a new subscriber was created.
- */
-async function createSubscriberFromRow({
-  email,
-}: {
-  email: string;
-}): Promise<"created" | "skipped"> {
-  const subscriber = await createSubscriber({
-    email,
-    source: "substack",
-    status: "verified",
-  });
-  return subscriber === undefined ? "skipped" : "created";
-}
-
 async function main(): Promise<void> {
   const csvPath = process.argv[2];
 
   if (csvPath === undefined || csvPath === "") {
     console.error("Error: CSV path is required as first argument");
-    console.error("Usage: yarn import:substack <path-to-csv>");
+    console.error("Usage: yarn compare:substack <path-to-csv>");
     process.exit(1);
   }
+
+  console.log(`Reading verified subscribers from database...`);
+  const verifiedSubscribers = await getAllVerifiedSubscribers();
+  const dbEmails = new Set(
+    verifiedSubscribers.map((sub) => sub.email.toLowerCase())
+  );
+
+  console.log(
+    `Found ${String(dbEmails.size)} verified subscribers in database`
+  );
 
   console.log(`Reading ${csvPath}...`);
   const content = await readFile(csvPath, "utf-8");
@@ -101,8 +94,7 @@ async function main(): Promise<void> {
   }
 
   const dataLines = lines.slice(1);
-  let created = 0;
-  let skipped = 0;
+  const csvEmails = new Set<string>();
   let invalid = 0;
 
   for (const line of dataLines) {
@@ -112,14 +104,25 @@ async function main(): Promise<void> {
       invalid++;
       continue;
     }
-    const result = await createSubscriberFromRow({ email });
-    if (result === "created") created++;
-    else skipped++;
+    csvEmails.add(email.toLowerCase());
   }
 
   console.log(
-    `Done. Created: ${String(created)}, Skipped (already exist): ${String(skipped)}, Invalid/skipped: ${String(invalid)}`
+    `Found ${String(csvEmails.size)} valid emails in CSV (${String(invalid)} invalid/skipped)`
   );
+
+  // Find verified subscribers NOT in CSV
+  const notInCsv: string[] = [];
+  for (const dbEmail of dbEmails) {
+    if (!csvEmails.has(dbEmail)) {
+      notInCsv.push(dbEmail);
+    }
+  }
+
+  console.log(
+    `\nFound ${String(notInCsv.length)} verified subscribers NOT in ${csvPath}:\n`
+  );
+  console.log(notInCsv.join(","));
 }
 
 main().catch((err: unknown) => {

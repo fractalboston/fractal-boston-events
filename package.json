@@ -20,7 +20,8 @@
     "email:test": "tsx scripts/send-test-email.ts",
     "import:subscribers": "tsx scripts/importSubscriberCsv.ts",
     "import:luma": "tsx scripts/importLumaSubscribers.ts",
-    "import:substack": "tsx scripts/importSubstackSubscribers.ts"
+    "import:substack": "tsx scripts/importSubstackSubscribers.ts",
+    "compare:substack": "tsx scripts/compareSubstackSubscribers.ts"
   },
   "dependencies": {
     "env-var": "^7.5.0",

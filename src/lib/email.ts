@@ -10,6 +10,7 @@ import {
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 import type { LumaEvent } from "@/lib/luma";
+import { updateLastEmailedAt } from "@/lib/subscribers";
 import { getLumaEventUrl } from "@/lib/urls";
 
 let resendClient: Resend | null = null;
@@ -173,14 +174,23 @@ export async function sendNewEventAlert(
   }
 }
 
-export async function sendBatchEmails(
-  emails: { email: string; token: string }[],
-  events: LumaEvent[],
-  appUrl: string,
-  type: "weekly" | "new-event",
-  singleEvent?: LumaEvent,
-  discordWebhookUrl?: string
-): Promise<{ success: number; failed: number; errors: Error[] }> {
+export async function sendBatchEmails({
+  emails,
+  events,
+  appUrl,
+  type,
+  singleEvent,
+  discordWebhookUrl,
+  updateLastEmailedAt: shouldUpdateLastEmailedAt = false,
+}: {
+  emails: { email: string; token: string }[];
+  events: LumaEvent[];
+  appUrl: string;
+  type: "weekly" | "new-event";
+  singleEvent?: LumaEvent;
+  discordWebhookUrl?: string;
+  updateLastEmailedAt?: boolean;
+}): Promise<{ success: number; failed: number; errors: Error[] }> {
   if (type === "new-event" && singleEvent === undefined) {
     throw new Error("singleEvent is required for new-event batch emails.");
   }
@@ -188,6 +198,7 @@ export async function sendBatchEmails(
   let success = 0;
   let failed = 0;
   const errors: Error[] = [];
+  const successfulEmails: string[] = [];
 
   // Resend has a batch API, but for simplicity we'll send individually
   // with a small delay to avoid rate limits (100/sec on free tier)
@@ -198,6 +209,8 @@ export async function sendBatchEmails(
       } else if (singleEvent !== undefined) {
         await sendNewEventAlert(email, token, singleEvent, appUrl, true);
       }
+
+      successfulEmails.push(email);
       success++;
       // Small delay to stay within rate limits (only if emailing is enabled)
       if (env.EMAIL_ENABLED) {
@@ -222,6 +235,23 @@ export async function sendBatchEmails(
           console.error("Failed to log error to Discord:", discordError);
         }
       }
+    }
+  }
+
+  // Batch update last_emailed_at for all successfully sent emails
+  // Important: Update even if there are errors - we need accurate tracking to avoid re-emailing
+  if (shouldUpdateLastEmailedAt && successfulEmails.length > 0) {
+    try {
+      await updateLastEmailedAt(successfulEmails);
+    } catch (updateError) {
+      // Log error but don't fail the entire batch - tracking is important but shouldn't block
+      // Include comma-separated list of emails for manual fix
+      const emailsList = successfulEmails.join(", ");
+      console.error(
+        `Failed to update last_emailed_at for ${String(successfulEmails.length)} successfully sent emails:`,
+        updateError
+      );
+      console.error(`Emails that need a last_emailed_at update: ${emailsList}`);
     }
   }
 

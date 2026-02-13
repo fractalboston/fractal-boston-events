@@ -68,14 +68,14 @@ export async function POST(request: Request): Promise<Response> {
 
     const subscribers = await getAllVerifiedSubscribers();
 
-    const { success } = await sendBatchEmails(
-      subscribers,
-      [],
-      env.APP_URL,
-      "new-event",
-      event,
-      env.DISCORD_LOGGING_WEBHOOK_URL
-    );
+    const { success } = await sendBatchEmails({
+      emails: subscribers,
+      events: [],
+      appUrl: env.APP_URL,
+      type: "new-event",
+      singleEvent: event,
+      discordWebhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+    });
 
     return sendSuccess<WebhookResponse>({
       message: `New event notification sent`,

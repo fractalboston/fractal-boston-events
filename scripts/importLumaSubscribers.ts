@@ -71,7 +71,7 @@ async function createSubscriberFromRow({
 async function main(): Promise<void> {
   const csvPath = process.argv[2];
 
-  if (!csvPath) {
+  if (csvPath === undefined || csvPath === "") {
     console.error("Error: CSV path is required as first argument");
     console.error("Usage: yarn import:luma <path-to-csv>");
     process.exit(1);

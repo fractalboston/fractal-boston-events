@@ -4,13 +4,7 @@ import { sendDiscordEmailJobStats, sendDiscordError } from "@/lib/discord";
 import { sendBatchEmails } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
-import { getVerifiedSubscribersByIds } from "@/lib/subscribers";
-
-const testingSubscribers = [
-  "019c30e3-8436-1d4d-f354-0aeb1d1e9bf3",
-  "019c30e1-25ce-bc93-cc63-857e0919edf7",
-  "019c30e1-434c-3a90-fe46-5eea2af2d482",
-];
+import { getAllVerifiedSubscribers } from "@/lib/subscribers";
 
 type CronResponse = {
   message: string;
@@ -31,13 +25,31 @@ export async function GET(): Promise<Response> {
     const events = await getReportableEvents(LUMA_CALENDAR_ID);
     console.log(`Found ${String(events.length)} events`);
 
-    // Fetch all verified subscribers from testingSubscribers array
-    const verifiedSubscribers =
-      await getVerifiedSubscribersByIds(testingSubscribers);
-    const subscribers = verifiedSubscribers.map((subscriber) => ({
-      email: subscriber.email,
-      token: subscriber.token,
-    }));
+    const verifiedSubscribers = await getAllVerifiedSubscribers();
+
+    // Filter out subscribers who were emailed within the last 48 hours
+    const now = new Date();
+    const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+
+    const subscribers = verifiedSubscribers
+      .filter((subscriber) => {
+        // Include if never emailed (null) or last emailed more than 48 hours ago
+        return (
+          subscriber.last_emailed_at === null ||
+          subscriber.last_emailed_at < fortyEightHoursAgo
+        );
+      })
+      .map((subscriber) => ({
+        email: subscriber.email,
+        token: subscriber.token,
+      }));
+
+    const skippedCount = verifiedSubscribers.length - subscribers.length;
+    if (skippedCount > 0) {
+      console.log(
+        `Skipped ${String(skippedCount)} subscribers who were emailed within the last 48 hours`
+      );
+    }
 
     // Skip sending emails if there are no events
     if (events.length === 0) {
@@ -66,17 +78,20 @@ export async function GET(): Promise<Response> {
 
     console.log(`Found ${String(subscribers.length)} subscribers`);
 
-    const { success, failed } = await sendBatchEmails(
-      subscribers,
+    const { success, failed } = await sendBatchEmails({
+      emails: subscribers,
       events,
-      APP_URL,
-      "weekly",
-      undefined,
-      DISCORD_LOGGING_WEBHOOK_URL
-    );
+      appUrl: APP_URL,
+      type: "weekly",
+      singleEvent: undefined,
+      discordWebhookUrl: DISCORD_LOGGING_WEBHOOK_URL,
+      updateLastEmailedAt: true,
+    });
 
     console.log(`Sent ${String(success)} emails`);
-    console.log(`Failed to send ${String(failed)} emails`);
+    if (failed > 0) {
+      console.error(`Failed to send ${String(failed)} emails`);
+    }
 
     try {
       const estimatedMonthlyUsage = subscribers.length * 4;

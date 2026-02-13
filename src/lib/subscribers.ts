@@ -13,6 +13,11 @@ export type CreateSubscriberInput = {
   status?: SubscriberStatus;
 };
 
+/**
+ * Create a new subscriber.
+ * IMPORTANT: Email is automatically lowercased before saving to ensure consistency.
+ * This is the only function that inserts emails into the database.
+ */
 export async function createSubscriber(
   input: CreateSubscriberInput
 ): Promise<Subscriber | undefined> {
@@ -221,4 +226,22 @@ export async function deleteSubscriber(id: string): Promise<boolean> {
     .where("id", "=", id)
     .executeTakeFirst();
   return Number(result.numDeletedRows) > 0;
+}
+
+/**
+ * Update last_emailed_at timestamp for multiple subscribers.
+ * IMPORTANT: Emails are automatically lowercased before updating to ensure consistency.
+ */
+export async function updateLastEmailedAt(emails: string[]): Promise<void> {
+  if (emails.length === 0) {
+    return;
+  }
+
+  const normalizedEmails = emails.map((email) => email.toLowerCase());
+
+  await db
+    .updateTable("subscribers")
+    .set({ last_emailed_at: sql`now()` })
+    .where("email", "in", normalizedEmails)
+    .execute();
 }

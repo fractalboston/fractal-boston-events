@@ -17,6 +17,7 @@ export type SubscribersTable = {
   token: Generated<string>;
   status: SubscriberStatus;
   source: "form" | "luma" | "substack" | "manual";
+  last_emailed_at: Date | null;
 };
 export type Subscriber = Degenerate<SubscribersTable>;
 
