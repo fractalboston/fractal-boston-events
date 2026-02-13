@@ -18,7 +18,9 @@
     "migrate:down": "tsx src/db/migrate.ts --down",
     "db:test": "tsx scripts/test-db-connection.ts",
     "email:test": "tsx scripts/send-test-email.ts",
-    "import:subscribers": "tsx scripts/importSubscriberCsv.ts"
+    "import:subscribers": "tsx scripts/importSubscriberCsv.ts",
+    "import:luma": "tsx scripts/importLumaSubscribers.ts",
+    "import:substack": "tsx scripts/importSubstackSubscribers.ts"
   },
   "dependencies": {
     "env-var": "^7.5.0",
