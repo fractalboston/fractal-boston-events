@@ -83,6 +83,7 @@ export default function SubscribersPage(): ReactElement {
   } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showAddSubscriberForm, setShowAddSubscriberForm] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const activeSearchControllerRef = useRef<AbortController | null>(null);
 
@@ -398,7 +399,7 @@ export default function SubscribersPage(): ReactElement {
     page: {
       padding: "2rem",
       fontFamily: "system-ui, -apple-system, sans-serif",
-      maxWidth: "720px",
+      maxWidth: "1400px",
       margin: "0 auto",
       backgroundColor: "#f3f4f6",
       minHeight: "100vh",
@@ -467,6 +468,16 @@ export default function SubscribersPage(): ReactElement {
       backgroundColor: "#f9fafb",
       fontSize: "13px",
       color: "#6b7280",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      cursor: "pointer",
+    },
+    chevron: {
+      fontSize: "12px",
+      color: "#9ca3af",
+      transition: "transform 0.2s",
+      userSelect: "none" as const,
     },
     listItem: (active: boolean): CSSProperties => ({
       padding: "12px 16px",
@@ -559,338 +570,424 @@ export default function SubscribersPage(): ReactElement {
   };
 
   return (
-    <div style={style.page}>
-      <Link href="/" style={style.backLink}>
-        ← Home
-      </Link>
-      <h1 style={style.h1}>Subscribers</h1>
-      <p style={style.description}>
-        Search updates automatically as you type. Sort results, then scroll to
-        load more subscribers.
-      </p>
+    <>
+      <style>{`
+        @media (min-width: 1024px) {
+          .subscribers-content-wrapper {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: flex-start !important;
+          }
+          .subscribers-left-column {
+            flex: 0 0 400px !important;
+          }
+          .subscribers-right-column {
+            flex: 1 1 auto !important;
+            position: sticky !important;
+            top: 2rem !important;
+            max-height: calc(100vh - 4rem) !important;
+            overflow-y: auto !important;
+          }
+          .add-subscriber-form {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .add-subscriber-form > div {
+            flex: 1 1 auto !important;
+            width: 100% !important;
+          }
+          .add-subscriber-button {
+            width: 100% !important;
+          }
+        }
+      `}</style>
+      <div style={style.page}>
+        <Link href="/" style={style.backLink}>
+          ← Home
+        </Link>
+        <h1 style={style.h1}>Subscribers</h1>
 
-      <div style={style.formRow}>
-        <div>
-          <label htmlFor="email-search" style={style.label}>
-            Email search
-          </label>
-          <input
-            id="email-search"
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-            }}
-            placeholder="e.g. user@example.com"
-            style={style.input}
-          />
-        </div>
-        <div>
-          <label htmlFor="subscriber-sort" style={style.label}>
-            Sort
-          </label>
-          <select
-            id="subscriber-sort"
-            value={sort}
-            onChange={(e) => {
-              setSort(e.target.value as SortOption);
-            }}
-            style={{ ...style.input, width: "180px" }}
-          >
-            <option value="newest">Newest first</option>
-            <option value="alphabetical">Alphabetical (A-Z)</option>
-            <option value="last_emailed">Last emailed</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor="subscriber-status-filter" style={style.label}>
-            Status
-          </label>
-          <select
-            id="subscriber-status-filter"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as StatusFilter);
-            }}
-            style={{ ...style.input, width: "180px" }}
-          >
-            <option value="all">All statuses</option>
-            {STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div style={{ ...style.card, marginBottom: "20px" }}>
-        <div style={style.cardHeader}>Add subscriber</div>
-        <div style={{ padding: "16px" }}>
-          <form
-            onSubmit={(e) => {
-              void handleCreate(e);
-            }}
-            style={{
-              display: "flex",
-              flexWrap: "nowrap",
-              gap: "12px",
-              alignItems: "flex-end",
-            }}
-          >
-            <div style={{ flex: "1.5 1 0", minWidth: 0 }}>
-              <label htmlFor="new-email" style={style.label}>
-                Email
-              </label>
-              <input
-                id="new-email"
-                type="email"
-                value={newEmail}
-                onChange={(e) => {
-                  setNewEmail(e.target.value);
-                }}
-                placeholder="email@example.com"
-                disabled={createLoading}
-                required
-                style={{ ...style.input, width: "100%" }}
-              />
-            </div>
-            <div style={{ flex: "1 1 0", minWidth: 0 }}>
-              <label htmlFor="new-source" style={style.label}>
-                Source
-              </label>
-              <select
-                id="new-source"
-                value={newSource}
-                onChange={(e) => {
-                  setNewSource(e.target.value as Subscriber["source"]);
-                }}
-                disabled={createLoading}
-                style={{ ...style.input, width: "100%" }}
-              >
-                {SOURCES.map((src) => (
-                  <option key={src} value={src}>
-                    {src}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ flex: "1 1 0", minWidth: 0 }}>
-              <label htmlFor="new-status" style={style.label}>
-                Status
-              </label>
-              <select
-                id="new-status"
-                value={newStatus}
-                onChange={(e) => {
-                  setNewStatus(e.target.value as Subscriber["status"]);
-                }}
-                disabled={createLoading}
-                style={{ ...style.input, width: "100%" }}
-              >
-                {STATUSES.map((st) => (
-                  <option key={st} value={st}>
-                    {st}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="submit"
-              disabled={createLoading}
-              style={{ ...style.button(createLoading), flexShrink: 0 }}
-            >
-              {createLoading ? "Adding…" : "Add"}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {message && <div style={style.message(message.type)}>{message.text}</div>}
-
-      {selected !== null && (
-        <div style={style.card}>
-          <div style={style.cardHeader}>Subscriber details</div>
-          <div style={style.detailSection}>
-            <div style={style.detailRow}>
-              <span style={style.detailKey}>id</span>
-              <span style={style.token}>{selected.id}</span>
-            </div>
-            <div style={style.detailRow}>
-              <span style={style.detailKey}>email</span>
-              {selected.email}
-            </div>
-            <div style={style.detailRow}>
-              <span style={style.detailKey}>token</span>
-              <span style={style.token}>{selected.token}</span>
-            </div>
-            <div style={style.detailRow}>
-              <span style={style.detailKey}>created_at</span>
-              {new Date(selected.created_at).toISOString()}
-            </div>
-            <div style={style.detailRow}>
-              <span style={style.detailKey}>updated_at</span>
-              {new Date(selected.updated_at).toISOString()}
-            </div>
-            <div style={style.detailRow}>
-              <span style={style.detailKey}>last_emailed_at</span>
-              {selected.last_emailed_at !== null
-                ? new Date(selected.last_emailed_at).toISOString()
-                : "never"}
-            </div>
-            <div style={{ marginTop: "16px", marginBottom: "8px" }}>
-              <span style={style.detailKey}>source</span>
-              <select
-                value={editSource}
-                onChange={(e) => {
-                  setEditSource(e.target.value as Subscriber["source"]);
-                }}
-                style={style.select}
-              >
-                {SOURCES.map((src) => (
-                  <option key={src} value={src}>
-                    {src}
-                  </option>
-                ))}
-              </select>
-              <span style={style.detailKey}>status</span>
-              <select
-                value={editStatus}
-                onChange={(e) => {
-                  setEditStatus(e.target.value as Subscriber["status"]);
-                }}
-                style={style.select}
-              >
-                {STATUSES.map((st) => (
-                  <option key={st} value={st}>
-                    {st}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={style.detailFooter}>
-              <button
-                type="button"
-                disabled={updateLoading}
-                onClick={() => {
-                  void handleUpdate();
-                }}
-                style={style.button(updateLoading)}
-              >
-                {updateLoading ? "Saving…" : "Save changes"}
-              </button>
-              <button
-                type="button"
-                disabled={deleteLoading}
-                onClick={() => {
-                  setShowDeleteConfirm(true);
-                }}
-                style={style.deleteButton(deleteLoading)}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDeleteConfirm && selected !== null && (
         <div
-          style={style.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-modal-title"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "24px",
+          }}
+          className="subscribers-content-wrapper"
         >
-          <div style={style.modalContent}>
-            <h2 id="delete-modal-title" style={style.modalTitle}>
-              Delete subscriber?
-            </h2>
-            <p style={style.modalText}>
-              This will permanently remove {selected.email} from the list. This
-              cannot be undone.
-            </p>
-            <div style={style.modalActions}>
-              <button
-                type="button"
-                disabled={deleteLoading}
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                }}
-                style={style.cancelButton}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={deleteLoading}
-                onClick={() => {
-                  void handleDelete();
-                }}
-                style={{
-                  ...style.button(deleteLoading),
-                  backgroundColor: "#dc2626",
-                }}
-              >
-                {deleteLoading ? "Deleting…" : "Delete"}
-              </button>
+          <div
+            style={{
+              flex: "0 0 auto",
+              minWidth: 0,
+            }}
+            className="subscribers-left-column"
+          >
+            <div style={style.formRow}>
+              <div>
+                <label htmlFor="email-search" style={style.label}>
+                  Email search
+                </label>
+                <input
+                  id="email-search"
+                  type="text"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                  }}
+                  placeholder="e.g. user@example.com"
+                  style={style.input}
+                />
+              </div>
+              <div>
+                <label htmlFor="subscriber-sort" style={style.label}>
+                  Sort
+                </label>
+                <select
+                  id="subscriber-sort"
+                  value={sort}
+                  onChange={(e) => {
+                    setSort(e.target.value as SortOption);
+                  }}
+                  style={{ ...style.input, width: "180px" }}
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="alphabetical">Alphabetical (A-Z)</option>
+                  <option value="last_emailed">Last emailed</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="subscriber-status-filter" style={style.label}>
+                  Status
+                </label>
+                <select
+                  id="subscriber-status-filter"
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value as StatusFilter);
+                  }}
+                  style={{ ...style.input, width: "180px" }}
+                >
+                  <option value="all">All statuses</option>
+                  {STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {results.length > 0 && (
-        <div style={style.card}>
-          <div style={style.cardHeader}>
-            {totalCount} subscriber{totalCount !== 1 ? "s" : ""}
-          </div>
-          {results.map((s) => (
-            <div
-              key={s.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                handleSelectSubscriber(s);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleSelectSubscriber(s);
-                }
-              }}
-              style={style.listItem(selected?.id === s.id)}
-            >
-              {s.email}
-              <span style={{ color: "#9ca3af", marginLeft: "8px" }}>
-                {s.status} · {s.source}
-              </span>
+            <div style={{ ...style.card, marginBottom: "20px" }}>
+              <div
+                style={style.cardHeader}
+                onClick={() => {
+                  setShowAddSubscriberForm(!showAddSubscriberForm);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setShowAddSubscriberForm(!showAddSubscriberForm);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <span>Add Subscriber</span>
+                <span
+                  style={{
+                    ...style.chevron,
+                    transform: showAddSubscriberForm
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                  }}
+                >
+                  ▼
+                </span>
+              </div>
+              {showAddSubscriberForm && (
+                <div style={{ padding: "16px" }}>
+                  <form
+                    onSubmit={(e) => {
+                      void handleCreate(e);
+                    }}
+                    className="add-subscriber-form"
+                    style={{
+                      display: "flex",
+                      flexWrap: "nowrap",
+                      gap: "12px",
+                      alignItems: "flex-end",
+                    }}
+                  >
+                    <div style={{ flex: "1.5 1 0", minWidth: 0 }}>
+                      <label htmlFor="new-email" style={style.label}>
+                        Email
+                      </label>
+                      <input
+                        id="new-email"
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => {
+                          setNewEmail(e.target.value);
+                        }}
+                        placeholder="email@example.com"
+                        disabled={createLoading}
+                        required
+                        style={{ ...style.input, width: "100%" }}
+                      />
+                    </div>
+                    <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                      <label htmlFor="new-source" style={style.label}>
+                        Source
+                      </label>
+                      <select
+                        id="new-source"
+                        value={newSource}
+                        onChange={(e) => {
+                          setNewSource(e.target.value as Subscriber["source"]);
+                        }}
+                        disabled={createLoading}
+                        style={{ ...style.input, width: "100%" }}
+                      >
+                        {SOURCES.map((src) => (
+                          <option key={src} value={src}>
+                            {src}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                      <label htmlFor="new-status" style={style.label}>
+                        Status
+                      </label>
+                      <select
+                        id="new-status"
+                        value={newStatus}
+                        onChange={(e) => {
+                          setNewStatus(e.target.value as Subscriber["status"]);
+                        }}
+                        disabled={createLoading}
+                        style={{ ...style.input, width: "100%" }}
+                      >
+                        {STATUSES.map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={createLoading}
+                      className="add-subscriber-button"
+                      style={{ ...style.button(createLoading), flexShrink: 0 }}
+                    >
+                      {createLoading ? "Adding…" : "Add"}
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
-          ))}
-          <div ref={loadMoreRef} style={{ height: "1px" }} />
-          {(loadMoreLoading || hasMore) && (
+
+            {message && (
+              <div style={style.message(message.type)}>{message.text}</div>
+            )}
+
+            {selected !== null && (
+              <div style={style.card}>
+                <div style={style.cardHeader}>Subscriber details</div>
+                <div style={style.detailSection}>
+                  <div style={style.detailRow}>
+                    <span style={style.detailKey}>id</span>
+                    <span style={style.token}>{selected.id}</span>
+                  </div>
+                  <div style={style.detailRow}>
+                    <span style={style.detailKey}>email</span>
+                    {selected.email}
+                  </div>
+                  <div style={style.detailRow}>
+                    <span style={style.detailKey}>token</span>
+                    <span style={style.token}>{selected.token}</span>
+                  </div>
+                  <div style={style.detailRow}>
+                    <span style={style.detailKey}>created_at</span>
+                    {new Date(selected.created_at).toISOString()}
+                  </div>
+                  <div style={style.detailRow}>
+                    <span style={style.detailKey}>updated_at</span>
+                    {new Date(selected.updated_at).toISOString()}
+                  </div>
+                  <div style={style.detailRow}>
+                    <span style={style.detailKey}>last_emailed_at</span>
+                    {selected.last_emailed_at !== null
+                      ? new Date(selected.last_emailed_at).toISOString()
+                      : "never"}
+                  </div>
+                  <div style={{ marginTop: "16px", marginBottom: "8px" }}>
+                    <span style={style.detailKey}>source</span>
+                    <select
+                      value={editSource}
+                      onChange={(e) => {
+                        setEditSource(e.target.value as Subscriber["source"]);
+                      }}
+                      style={style.select}
+                    >
+                      {SOURCES.map((src) => (
+                        <option key={src} value={src}>
+                          {src}
+                        </option>
+                      ))}
+                    </select>
+                    <span style={style.detailKey}>status</span>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => {
+                        setEditStatus(e.target.value as Subscriber["status"]);
+                      }}
+                      style={style.select}
+                    >
+                      {STATUSES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={style.detailFooter}>
+                    <button
+                      type="button"
+                      disabled={updateLoading}
+                      onClick={() => {
+                        void handleUpdate();
+                      }}
+                      style={style.button(updateLoading)}
+                    >
+                      {updateLoading ? "Saving…" : "Save changes"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deleteLoading}
+                      onClick={() => {
+                        setShowDeleteConfirm(true);
+                      }}
+                      style={style.deleteButton(deleteLoading)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {hasLoadedResults &&
+              !searchLoading &&
+              results.length === 0 &&
+              message === null && (
+                <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                  {query.trim() === ""
+                    ? "No subscribers found."
+                    : `No subscribers match "${query.trim()}".`}
+                </p>
+              )}
+          </div>
+
+          {results.length > 0 && (
             <div
               style={{
-                padding: "12px 16px",
-                fontSize: "13px",
-                color: "#6b7280",
-                borderTop: "1px solid #e5e7eb",
+                flex: "1 1 auto",
+                minWidth: 0,
               }}
+              className="subscribers-right-column"
             >
-              {loadMoreLoading ? "Loading more..." : "Scroll to load more"}
+              <div style={style.card}>
+                <div style={style.cardHeader}>
+                  {totalCount} subscriber{totalCount !== 1 ? "s" : ""}
+                </div>
+                {results.map((s) => (
+                  <div
+                    key={s.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      handleSelectSubscriber(s);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleSelectSubscriber(s);
+                      }
+                    }}
+                    style={style.listItem(selected?.id === s.id)}
+                  >
+                    {s.email}
+                    <span style={{ color: "#9ca3af", marginLeft: "8px" }}>
+                      {s.status} · {s.source}
+                    </span>
+                  </div>
+                ))}
+                <div ref={loadMoreRef} style={{ height: "1px" }} />
+                {(loadMoreLoading || hasMore) && (
+                  <div
+                    style={{
+                      padding: "12px 16px",
+                      fontSize: "13px",
+                      color: "#6b7280",
+                      borderTop: "1px solid #e5e7eb",
+                    }}
+                  >
+                    {loadMoreLoading
+                      ? "Loading more..."
+                      : "Scroll to load more"}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
-      )}
 
-      {hasLoadedResults &&
-        !searchLoading &&
-        results.length === 0 &&
-        message === null && (
-          <p style={{ fontSize: "14px", color: "#6b7280" }}>
-            {query.trim() === ""
-              ? "No subscribers found."
-              : `No subscribers match "${query.trim()}".`}
-          </p>
+        {showDeleteConfirm && selected !== null && (
+          <div
+            style={style.modalOverlay}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+          >
+            <div style={style.modalContent}>
+              <h2 id="delete-modal-title" style={style.modalTitle}>
+                Delete subscriber?
+              </h2>
+              <p style={style.modalText}>
+                This will permanently remove {selected.email} from the list.
+                This cannot be undone.
+              </p>
+              <div style={style.modalActions}>
+                <button
+                  type="button"
+                  disabled={deleteLoading}
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                  }}
+                  style={style.cancelButton}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteLoading}
+                  onClick={() => {
+                    void handleDelete();
+                  }}
+                  style={{
+                    ...style.button(deleteLoading),
+                    backgroundColor: "#dc2626",
+                  }}
+                >
+                  {deleteLoading ? "Deleting…" : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
-    </div>
+      </div>
+    </>
   );
 }

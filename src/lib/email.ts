@@ -20,6 +20,37 @@ function getResend(): Resend {
   return resendClient;
 }
 
+export class ResendQuotaError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ResendQuotaError";
+  }
+}
+
+function isQuotaError(error: unknown): boolean {
+  if (error === null || error === undefined) {
+    return false;
+  }
+
+  const errorObj = error as Record<string, unknown>;
+  const messageValue = errorObj.message;
+  const typeValue = errorObj.type;
+  const statusCode = errorObj.status ?? errorObj.statusCode;
+
+  const errorMessage =
+    typeof messageValue === "string" ? messageValue.toLowerCase() : "";
+  const errorType =
+    typeof typeValue === "string" ? typeValue.toLowerCase() : "";
+
+  return (
+    statusCode === 429 ||
+    errorMessage.includes("quota") ||
+    errorMessage.includes("daily_quota_exceeded") ||
+    errorMessage.includes("rate limit") ||
+    errorType === "daily_quota_exceeded"
+  );
+}
+
 async function sendEmailIfEnabled({
   to,
   subject,
@@ -35,12 +66,41 @@ async function sendEmailIfEnabled({
   }
 
   const resend = getResend();
-  await resend.emails.send({
-    from: EMAIL_FROM,
-    to,
-    subject,
-    html,
-  });
+  try {
+    const result = await resend.emails.send({
+      from: EMAIL_FROM,
+      to,
+      subject,
+      html,
+    });
+
+    if (result.error) {
+      const errorMessage =
+        typeof result.error.message === "string"
+          ? result.error.message
+          : "Unknown Resend error";
+      if (isQuotaError(result.error)) {
+        throw new ResendQuotaError(`Resend quota exceeded: ${errorMessage}`);
+      }
+      throw new Error(`Resend API error: ${errorMessage}`);
+    }
+
+    if (!result.data.id) {
+      throw new Error(
+        "Resend API returned invalid response - email may not have been sent"
+      );
+    }
+  } catch (error) {
+    if (error instanceof ResendQuotaError) {
+      throw error;
+    }
+    if (isQuotaError(error)) {
+      throw new ResendQuotaError(
+        `Resend quota exceeded: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    throw error;
+  }
 }
 
 export async function sendVerificationEmail(
@@ -222,6 +282,14 @@ export async function sendBatchEmails({
       errors.push(err);
       failed++;
 
+      // IMPORTANT: Do not mark email as sent if quota error occurred
+      // The email was not actually sent, so we should not update last_emailed_at
+      if (error instanceof ResendQuotaError) {
+        console.warn(
+          `Resend quota exceeded - email to ${email} was NOT sent and will NOT be marked as sent`
+        );
+      }
+
       // Log to Discord if webhook URL is provided
       if (discordWebhookUrl !== undefined) {
         try {
@@ -229,7 +297,7 @@ export async function sendBatchEmails({
           await sendDiscordError(
             discordWebhookUrl,
             err,
-            `Failed to send email to ${email}`
+            `Failed to send email to ${email}${error instanceof ResendQuotaError ? " (QUOTA EXCEEDED)" : ""}`
           );
         } catch (discordError) {
           console.error("Failed to log error to Discord:", discordError);
@@ -321,12 +389,41 @@ export async function sendTestEmail(
   const { from, subject, html } = getBasicEmailContent(events, true);
 
   const resend = getResend();
-  await resend.emails.send({
-    from,
-    to: email,
-    subject,
-    html,
-  });
+  try {
+    const result = await resend.emails.send({
+      from,
+      to: email,
+      subject,
+      html,
+    });
+
+    if (result.error) {
+      const errorMessage =
+        typeof result.error.message === "string"
+          ? result.error.message
+          : "Unknown Resend error";
+      if (isQuotaError(result.error)) {
+        throw new ResendQuotaError(`Resend quota exceeded: ${errorMessage}`);
+      }
+      throw new Error(`Resend API error: ${errorMessage}`);
+    }
+
+    if (!result.data.id) {
+      throw new Error(
+        "Resend API returned invalid response - email may not have been sent"
+      );
+    }
+  } catch (error) {
+    if (error instanceof ResendQuotaError) {
+      throw error;
+    }
+    if (isQuotaError(error)) {
+      throw new ResendQuotaError(
+        `Resend quota exceeded: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    throw error;
+  }
 
   await sendDiscordInfo({
     webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
