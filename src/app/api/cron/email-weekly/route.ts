@@ -60,8 +60,6 @@ export async function GET(): Promise<Response> {
           emailsFailed: 0,
           eventsCount: 0,
           subscribersCount: subscribers.length,
-          resendMonthlyLimit: 3000,
-          resendMonthlyUsed: subscribers.length * 4,
         });
       } catch (discordError) {
         console.error("Failed to send stats to Discord:", discordError);
@@ -93,14 +91,11 @@ export async function GET(): Promise<Response> {
     }
 
     try {
-      const estimatedMonthlyUsage = subscribers.length * 4;
       await sendDiscordEmailJobStats(DISCORD_LOGGING_WEBHOOK_URL, {
         emailsSent: success,
         emailsFailed: failed,
         eventsCount: events.length,
         subscribersCount: subscribers.length,
-        resendMonthlyLimit: 3000,
-        resendMonthlyUsed: estimatedMonthlyUsage,
       });
     } catch (discordError) {
       console.error("Failed to send stats to Discord:", discordError);

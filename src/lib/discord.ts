@@ -158,8 +158,6 @@ export async function sendDiscordEmailJobStats(
     emailsFailed: number;
     eventsCount: number;
     subscribersCount: number;
-    resendMonthlyLimit: number;
-    resendMonthlyUsed: number;
   }
 ): Promise<void> {
   const currentDate = new Date().toLocaleDateString("en-US", {
@@ -170,20 +168,12 @@ export async function sendDiscordEmailJobStats(
     timeZone: TIME_ZONE,
   });
 
-  const percentUsed =
-    (stats.resendMonthlyUsed / stats.resendMonthlyLimit) * 100;
-  const warningThreshold = 75;
-
   let content = `📧 **Weekly Email Job Complete** - ${currentDate}`;
-  if (percentUsed >= warningThreshold) {
-    content = `⚠️ ${content}\n**WARNING: Approaching Resend monthly limit!**`;
-  }
   content += `\n\n**Email Job Stats**\n`;
   content += `📨 Emails Sent: ${String(stats.emailsSent)}\n`;
   content += `❌ Emails Failed: ${String(stats.emailsFailed)}\n`;
   content += `Events Included: ${String(stats.eventsCount)}\n`;
-  content += `👥 Total Subscribers: ${String(stats.subscribersCount)}\n`;
-  content += `📊 Resend Usage: ${String(stats.resendMonthlyUsed)} / ${String(stats.resendMonthlyLimit)} (${percentUsed.toFixed(1)}%)`;
+  content += `👥 Total Subscribers: ${String(stats.subscribersCount)}`;
 
   const payload: DiscordWebhookPayload = {
     content,

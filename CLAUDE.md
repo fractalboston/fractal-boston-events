@@ -46,7 +46,7 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 | **Kysely**                    | Type-safe SQL query builder, no ORM magic           |
 | **Zod v4**                    | Runtime validation with TypeScript inference        |
 | **env-var**                   | Type-safe environment variable validation           |
-| **Resend**                    | Simple email API, good free tier, easy domain setup |
+| **AWS SES**                   | Reliable email service, pay-as-you-go pricing, scalable |
 | **Vercel**                    | Free hosting, native cron support, maxDuration=300s |
 | **Supabase**                  | Free Postgres, easy setup                           |
 
@@ -122,12 +122,14 @@ Configure these webhooks in Luma dashboard:
 
 Both webhooks need the `X-Luma-Signature` header set to your `LUMA_WEBHOOK_SECRET`.
 
-## Resend Domain Setup
+## AWS SES Domain Setup
 
-1. Add domain `fractal.boston` in Resend dashboard
-2. Add DNS records (DKIM, SPF, DMARC)
-3. Verify domain
-4. Emails will be sent from `events@fractal.boston`
+1. Go to AWS SES Console → Verified identities
+2. Add domain `fractal.boston`
+3. Add DNS records (DKIM, SPF, DMARC) provided by SES
+4. Verify domain
+5. Request production access if in SES sandbox (required for sending to unverified emails)
+6. Emails will be sent from `events@fractal.boston`
 
 ## Discord Webhook Setup
 
@@ -151,8 +153,6 @@ Both webhooks need the `X-Luma-Signature` header set to your `LUMA_WEBHOOK_SECRE
   - Emails sent/failed count
   - Events included
   - Total subscriber count
-  - Resend monthly usage estimate
-  - **Warning** alerts when approaching 75% of Resend monthly limit
 - Individual email failure notifications
 
 ## Development
@@ -211,8 +211,8 @@ const response = await fetch('https://fb-events.vercel.app/api/subscribe', {
 
 ## Scaling Notes
 
-- **Free tier limits**: Resend 3k emails/month (~750 weekly subscribers)
+- **Pricing**: AWS SES charges $0.10 per 1,000 emails (very affordable)
+- **Rate limits**: SES has account-based sending limits (can be increased via support)
 - **Batch sending**: 50ms delay between emails to avoid rate limits
 - **Database**: Supabase free tier supports thousands of subscribers
-- **Monitoring**: System warns in Discord when approaching 75% of Resend monthly limit
-- **If scaling beyond free tier**: Consider Amazon SES ($0.10/1k emails)
+- **SES Sandbox**: New SES accounts start in sandbox mode (can only send to verified emails). Request production access to send to any email address.

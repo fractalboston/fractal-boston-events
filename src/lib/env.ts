@@ -3,7 +3,9 @@ import env from "env-var";
 export type Env = {
   LUMA_CALENDAR_ID: string;
   LUMA_WEBHOOK_SECRET: string;
-  RESEND_API_KEY: string;
+  AWS_ACCESS_KEY_ID: string;
+  AWS_SECRET_ACCESS_KEY: string;
+  AWS_REGION: string;
   DISCORD_EVENTS_WEBHOOK_URL: string;
   DISCORD_LOGGING_WEBHOOK_URL: string;
   DISCORD_MOD_ROLE_ID: string;
@@ -20,7 +22,9 @@ export type Env = {
 const config: Env = {
   LUMA_CALENDAR_ID: env.get("LUMA_CALENDAR_ID").required().asString(),
   LUMA_WEBHOOK_SECRET: env.get("LUMA_WEBHOOK_SECRET").required().asString(),
-  RESEND_API_KEY: env.get("RESEND_API_KEY").required().asString(),
+  AWS_ACCESS_KEY_ID: env.get("AWS_ACCESS_KEY_ID").required().asString(),
+  AWS_SECRET_ACCESS_KEY: env.get("AWS_SECRET_ACCESS_KEY").required().asString(),
+  AWS_REGION: env.get("AWS_REGION").default("us-east-1").asString(),
   DISCORD_EVENTS_WEBHOOK_URL: env
     .get("DISCORD_EVENTS_WEBHOOK_URL")
     .required()

@@ -1,4 +1,8 @@
-import { Resend } from "resend";
+import {
+  SESClient,
+  SendEmailCommand,
+  type SendEmailCommandInput,
+} from "@aws-sdk/client-ses";
 import { BRAND_COLOR, EMAIL_FROM } from "@/lib/constants";
 import { sendDiscordEmailLog, sendDiscordInfo } from "@/lib/discord";
 import {
@@ -13,17 +17,25 @@ import type { LumaEvent } from "@/lib/luma";
 import { updateLastEmailedAt } from "@/lib/subscribers";
 import { getLumaEventUrl } from "@/lib/urls";
 
-let resendClient: Resend | null = null;
+let sesClient: SESClient | null = null;
 
-function getResend(): Resend {
-  resendClient ??= new Resend(env.RESEND_API_KEY);
-  return resendClient;
+function getSES(): SESClient {
+  if (sesClient === null) {
+    sesClient = new SESClient({
+      region: env.AWS_REGION,
+      credentials: {
+        accessKeyId: env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+      },
+    });
+  }
+  return sesClient;
 }
 
-export class ResendQuotaError extends Error {
+export class SESQuotaError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ResendQuotaError";
+    this.name = "SESQuotaError";
   }
 }
 
@@ -34,20 +46,24 @@ function isQuotaError(error: unknown): boolean {
 
   const errorObj = error as Record<string, unknown>;
   const messageValue = errorObj.message;
-  const typeValue = errorObj.type;
-  const statusCode = errorObj.status ?? errorObj.statusCode;
+  const nameValue = errorObj.name;
+  const codeValue = errorObj.Code ?? errorObj.code;
 
   const errorMessage =
     typeof messageValue === "string" ? messageValue.toLowerCase() : "";
-  const errorType =
-    typeof typeValue === "string" ? typeValue.toLowerCase() : "";
+  const errorName =
+    typeof nameValue === "string" ? nameValue.toLowerCase() : "";
+  const errorCode =
+    typeof codeValue === "string" ? codeValue.toLowerCase() : "";
 
+  // SES quota errors typically have codes like "Throttling", "MessageRejected", or "MailFromDomainNotVerified"
+  // Rate limiting errors are usually "Throttling"
   return (
-    statusCode === 429 ||
+    errorCode === "throttling" ||
+    errorMessage.includes("throttl") ||
     errorMessage.includes("quota") ||
-    errorMessage.includes("daily_quota_exceeded") ||
     errorMessage.includes("rate limit") ||
-    errorType === "daily_quota_exceeded"
+    errorName === "throttlingexception"
   );
 }
 
@@ -65,38 +81,46 @@ async function sendEmailIfEnabled({
     return;
   }
 
-  const resend = getResend();
+  const ses = getSES();
   try {
-    const result = await resend.emails.send({
-      from: EMAIL_FROM,
-      to,
-      subject,
-      html,
-    });
+    // Extract email address from EMAIL_FROM format "Name <email@domain.com>" or just "email@domain.com"
+    const fromMatch = EMAIL_FROM.match(/<(.+)>/) ?? [null, EMAIL_FROM];
+    const fromEmail = fromMatch[1] ?? EMAIL_FROM;
 
-    if (result.error) {
-      const errorMessage =
-        typeof result.error.message === "string"
-          ? result.error.message
-          : "Unknown Resend error";
-      if (isQuotaError(result.error)) {
-        throw new ResendQuotaError(`Resend quota exceeded: ${errorMessage}`);
-      }
-      throw new Error(`Resend API error: ${errorMessage}`);
-    }
+    const params: SendEmailCommandInput = {
+      Source: EMAIL_FROM,
+      Destination: {
+        ToAddresses: [to],
+      },
+      Message: {
+        Subject: {
+          Data: subject,
+          Charset: "UTF-8",
+        },
+        Body: {
+          Html: {
+            Data: html,
+            Charset: "UTF-8",
+          },
+        },
+      },
+    };
 
-    if (!result.data.id) {
+    const command = new SendEmailCommand(params);
+    const result = await ses.send(command);
+
+    if (!result.MessageId) {
       throw new Error(
-        "Resend API returned invalid response - email may not have been sent"
+        "SES API returned invalid response - email may not have been sent"
       );
     }
   } catch (error) {
-    if (error instanceof ResendQuotaError) {
+    if (error instanceof SESQuotaError) {
       throw error;
     }
     if (isQuotaError(error)) {
-      throw new ResendQuotaError(
-        `Resend quota exceeded: ${error instanceof Error ? error.message : String(error)}`
+      throw new SESQuotaError(
+        `SES quota exceeded: ${error instanceof Error ? error.message : String(error)}`
       );
     }
     throw error;
@@ -260,8 +284,8 @@ export async function sendBatchEmails({
   const errors: Error[] = [];
   const successfulEmails: string[] = [];
 
-  // Resend has a batch API, but for simplicity we'll send individually
-  // with a small delay to avoid rate limits (100/sec on free tier)
+  // SES sends emails individually
+  // with a small delay to avoid rate limits (SES has rate limits based on account)
   for (const { email, token } of emails) {
     try {
       if (type === "weekly") {
@@ -284,9 +308,9 @@ export async function sendBatchEmails({
 
       // IMPORTANT: Do not mark email as sent if quota error occurred
       // The email was not actually sent, so we should not update last_emailed_at
-      if (error instanceof ResendQuotaError) {
+      if (error instanceof SESQuotaError) {
         console.warn(
-          `Resend quota exceeded - email to ${email} was NOT sent and will NOT be marked as sent`
+          `SES quota exceeded - email to ${email} was NOT sent and will NOT be marked as sent`
         );
       }
 
@@ -297,7 +321,7 @@ export async function sendBatchEmails({
           await sendDiscordError(
             discordWebhookUrl,
             err,
-            `Failed to send email to ${email}${error instanceof ResendQuotaError ? " (QUOTA EXCEEDED)" : ""}`
+            `Failed to send email to ${email}${error instanceof SESQuotaError ? " (QUOTA EXCEEDED)" : ""}`
           );
         } catch (discordError) {
           console.error("Failed to log error to Discord:", discordError);
@@ -388,38 +412,42 @@ export async function sendTestEmail(
   );
   const { from, subject, html } = getBasicEmailContent(events, true);
 
-  const resend = getResend();
+  const ses = getSES();
   try {
-    const result = await resend.emails.send({
-      from,
-      to: email,
-      subject,
-      html,
-    });
+    const params: SendEmailCommandInput = {
+      Source: from,
+      Destination: {
+        ToAddresses: [email],
+      },
+      Message: {
+        Subject: {
+          Data: subject,
+          Charset: "UTF-8",
+        },
+        Body: {
+          Html: {
+            Data: html,
+            Charset: "UTF-8",
+          },
+        },
+      },
+    };
 
-    if (result.error) {
-      const errorMessage =
-        typeof result.error.message === "string"
-          ? result.error.message
-          : "Unknown Resend error";
-      if (isQuotaError(result.error)) {
-        throw new ResendQuotaError(`Resend quota exceeded: ${errorMessage}`);
-      }
-      throw new Error(`Resend API error: ${errorMessage}`);
-    }
+    const command = new SendEmailCommand(params);
+    const result = await ses.send(command);
 
-    if (!result.data.id) {
+    if (!result.MessageId) {
       throw new Error(
-        "Resend API returned invalid response - email may not have been sent"
+        "SES API returned invalid response - email may not have been sent"
       );
     }
   } catch (error) {
-    if (error instanceof ResendQuotaError) {
+    if (error instanceof SESQuotaError) {
       throw error;
     }
     if (isQuotaError(error)) {
-      throw new ResendQuotaError(
-        `Resend quota exceeded: ${error instanceof Error ? error.message : String(error)}`
+      throw new SESQuotaError(
+        `SES quota exceeded: ${error instanceof Error ? error.message : String(error)}`
       );
     }
     throw error;

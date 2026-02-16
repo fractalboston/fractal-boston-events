@@ -24,7 +24,7 @@ yarn dev
 See [AGENTS.md](./AGENTS.md) and [CLAUDE.md](./CLAUDE.md) for detailed setup instructions including:
 
 - Supabase database setup
-- Resend domain verification
+- AWS SES domain verification
 - Luma webhook configuration
 - Discord webhook setup
 - Vercel deployment
