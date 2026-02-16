@@ -10,7 +10,7 @@ export const config: VercelConfig = {
       maxDuration: 300,
     },
     "src/app/api/cron/discord-weekly/route.ts": {
-      maxDuration: 60,
+      maxDuration: 300,
     },
     "src/app/api/webhooks/luma/event/route.ts": {
       maxDuration: 300,

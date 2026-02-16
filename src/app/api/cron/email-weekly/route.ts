@@ -27,16 +27,15 @@ export async function GET(): Promise<Response> {
 
     const verifiedSubscribers = await getAllVerifiedSubscribers();
 
-    // Filter out subscribers who were emailed within the last 48 hours
+    // Filter out subscribers who were emailed within the last 5 days
     const now = new Date();
-    const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
 
     const subscribers = verifiedSubscribers
       .filter((subscriber) => {
-        // Include if never emailed (null) or last emailed more than 48 hours ago
         return (
           subscriber.last_emailed_at === null ||
-          subscriber.last_emailed_at < fortyEightHoursAgo
+          subscriber.last_emailed_at < fiveDaysAgo
         );
       })
       .map((subscriber) => ({
@@ -47,7 +46,7 @@ export async function GET(): Promise<Response> {
     const skippedCount = verifiedSubscribers.length - subscribers.length;
     if (skippedCount > 0) {
       console.log(
-        `Skipped ${String(skippedCount)} subscribers who were emailed within the last 48 hours`
+        `Skipped ${String(skippedCount)} subscribers who were emailed within the last 5 days`
       );
     }
 
