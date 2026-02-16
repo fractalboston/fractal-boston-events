@@ -143,7 +143,7 @@ export async function searchSubscribersByEmail({
   offset,
 }: {
   query: string;
-  sort: "newest" | "alphabetical";
+  sort: "newest" | "alphabetical" | "last_emailed";
   status?: SubscriberStatus;
   limit: number;
   offset: number;
@@ -173,6 +173,10 @@ export async function searchSubscribersByEmail({
   let listQuery = filteredQuery.selectAll();
   if (sort === "alphabetical") {
     listQuery = listQuery.orderBy("email", "asc").orderBy("created_at", "desc");
+  } else if (sort === "last_emailed") {
+    listQuery = listQuery
+      .orderBy(sql`last_emailed_at desc nulls last`)
+      .orderBy("email", "asc");
   } else {
     listQuery = listQuery.orderBy("created_at", "desc").orderBy("email", "asc");
   }

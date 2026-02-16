@@ -13,6 +13,7 @@ type Subscriber = {
   token: string;
   status: "pending" | "verified" | "unsubscribed";
   source: "form" | "luma" | "substack" | "manual";
+  last_emailed_at: string | null;
 };
 
 type SearchResponse = {
@@ -53,7 +54,7 @@ const STATUSES: Subscriber["status"][] = [
 const SEARCH_DEBOUNCE_MS = 500;
 const PAGE_SIZE = 50;
 
-type SortOption = "newest" | "alphabetical";
+type SortOption = "newest" | "alphabetical" | "last_emailed";
 type StatusFilter = "all" | Subscriber["status"];
 
 export default function SubscribersPage(): ReactElement {
@@ -598,6 +599,7 @@ export default function SubscribersPage(): ReactElement {
           >
             <option value="newest">Newest first</option>
             <option value="alphabetical">Alphabetical (A-Z)</option>
+            <option value="last_emailed">Last emailed</option>
           </select>
         </div>
         <div>
@@ -729,6 +731,12 @@ export default function SubscribersPage(): ReactElement {
             <div style={style.detailRow}>
               <span style={style.detailKey}>updated_at</span>
               {new Date(selected.updated_at).toISOString()}
+            </div>
+            <div style={style.detailRow}>
+              <span style={style.detailKey}>last_emailed_at</span>
+              {selected.last_emailed_at !== null
+                ? new Date(selected.last_emailed_at).toISOString()
+                : "never"}
             </div>
             <div style={{ marginTop: "16px", marginBottom: "8px" }}>
               <span style={style.detailKey}>source</span>
