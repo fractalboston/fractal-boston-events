@@ -10,6 +10,7 @@ import { isDevelopment } from "@/lib/env";
 import {
   createSubscriber,
   deleteSubscriber,
+  getSubscriberById,
   searchSubscribersByEmail,
   updateSubscriber,
 } from "@/lib/subscribers";
@@ -24,6 +25,7 @@ type CreateBody = z.infer<typeof createBodySchema>;
 
 const updateBodySchema = z.object({
   id: z.string().min(1),
+  email: z.email().optional(),
   source: z.enum(["form", "luma", "substack", "manual"]).optional(),
   status: z.enum(["pending", "verified", "unsubscribed"]).optional(),
 });
@@ -135,9 +137,17 @@ export async function PUT(request: Request): Promise<Response> {
     if (!parsed.success) {
       return sendBadRequest(parsed.error.message);
     }
-    const { id, source, status }: UpdateBody = parsed.data;
-    const updated = await updateSubscriber({ id, source, status });
+    const { id, email, source, status }: UpdateBody = parsed.data;
+    const updated = await updateSubscriber({ id, email, source, status });
     if (updated === undefined) {
+      // Check if subscriber exists to determine if it's a not found or email conflict
+      const existing = await getSubscriberById(id);
+      if (existing === undefined) {
+        return sendNotFound("Subscriber not found");
+      }
+      if (email !== undefined) {
+        return sendError(409, "A subscriber with this email already exists.");
+      }
       return sendNotFound("Subscriber not found");
     }
     return sendSuccess({ subscriber: updated });

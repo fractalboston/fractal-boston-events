@@ -195,6 +195,7 @@ export async function searchSubscribersByEmail({
 
 export type UpdateSubscriberInput = {
   id: string;
+  email?: string;
   source?: "form" | "luma" | "substack" | "manual";
   status?: SubscriberStatus;
 };
@@ -203,9 +204,11 @@ export async function updateSubscriber(
   input: UpdateSubscriberInput
 ): Promise<Subscriber | undefined> {
   const updates: Partial<{
+    email: string;
     source: "form" | "luma" | "substack" | "manual";
     status: SubscriberStatus;
   }> = {};
+  if (input.email !== undefined) updates.email = input.email.toLowerCase();
   if (input.source !== undefined) updates.source = input.source;
   if (input.status !== undefined) updates.status = input.status;
   if (Object.keys(updates).length === 0) {
@@ -215,6 +218,20 @@ export async function updateSubscriber(
       .where("id", "=", input.id)
       .executeTakeFirst();
   }
+
+  // Check if email already exists (excluding current subscriber)
+  if (input.email !== undefined) {
+    const existing = await db
+      .selectFrom("subscribers")
+      .selectAll()
+      .where("email", "=", input.email.toLowerCase())
+      .where("id", "!=", input.id)
+      .executeTakeFirst();
+    if (existing !== undefined) {
+      return undefined; // Email conflict - API will return appropriate error
+    }
+  }
+
   const result = await db
     .updateTable("subscribers")
     .set(updates)

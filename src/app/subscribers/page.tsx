@@ -70,6 +70,7 @@ export default function SubscribersPage(): ReactElement {
   const [searchLoading, setSearchLoading] = useState(false);
   const [loadMoreLoading, setLoadMoreLoading] = useState(false);
   const [selected, setSelected] = useState<Subscriber | null>(null);
+  const [editEmail, setEditEmail] = useState("");
   const [editSource, setEditSource] = useState<Subscriber["source"] | "">("");
   const [editStatus, setEditStatus] = useState<Subscriber["status"] | "">("");
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -251,6 +252,7 @@ export default function SubscribersPage(): ReactElement {
 
   function handleSelectSubscriber(s: Subscriber): void {
     setSelected(s);
+    setEditEmail(s.email);
     setEditSource(s.source);
     setEditStatus(s.status);
     setMessage(null);
@@ -284,6 +286,7 @@ export default function SubscribersPage(): ReactElement {
         });
         setNewEmail("");
         setSelected(data.data.subscriber);
+        setEditEmail(data.data.subscriber.email);
         setEditSource(data.data.subscriber.source);
         setEditStatus(data.data.subscriber.status);
         void runSearch({
@@ -309,6 +312,13 @@ export default function SubscribersPage(): ReactElement {
 
   async function handleUpdate(): Promise<void> {
     if (selected === null) return;
+    if (editEmail.trim() === "") {
+      setMessage({
+        type: "error",
+        text: "Enter an email address",
+      });
+      return;
+    }
     if (editSource === "" || editStatus === "") {
       setMessage({
         type: "error",
@@ -324,6 +334,7 @@ export default function SubscribersPage(): ReactElement {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: selected.id,
+          email: editEmail.trim(),
           source: editSource,
           status: editStatus,
         }),
@@ -331,6 +342,7 @@ export default function SubscribersPage(): ReactElement {
       const data = (await response.json()) as UpdateResponse;
       if (data.success && data.data?.subscriber !== undefined) {
         setSelected(data.data.subscriber);
+        setEditEmail(data.data.subscriber.email);
         setEditSource(data.data.subscriber.source);
         setEditStatus(data.data.subscriber.status);
         setMessage({ type: "success", text: "Subscriber updated." });
@@ -802,7 +814,20 @@ export default function SubscribersPage(): ReactElement {
                   </div>
                   <div style={style.detailRow}>
                     <span style={style.detailKey}>email</span>
-                    {selected.email}
+                    <input
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => {
+                        setEditEmail(e.target.value);
+                      }}
+                      disabled={updateLoading}
+                      style={{
+                        ...style.input,
+                        width: "100%",
+                        maxWidth: "400px",
+                        marginTop: "4px",
+                      }}
+                    />
                   </div>
                   <div style={style.detailRow}>
                     <span style={style.detailKey}>token</span>
