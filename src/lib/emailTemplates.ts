@@ -85,8 +85,10 @@ export function buildEmailBody(
     <a href="${HOMEPAGE_URL}" style="color: ${BRAND_COLOR};">fractal.boston</a> | <a href="${CALENDAR_URL}" style="color: ${BRAND_COLOR};">/calendar</a> | <a href="${DISCORD_URL}" style="color: ${BRAND_COLOR};">/discord</a>
   </p>
   `.trim();
-  const href = unsubscribeUrl ?? "#";
-  const unsubscribeLine = `<p style="font-size: 12px;"><a href="${href}" style="font-size: 12px; color: ${BRAND_COLOR};">Unsubscribe</a> from these emails.</p>`;
+  const unsubscribeLine =
+    unsubscribeUrl !== undefined && unsubscribeUrl !== ""
+      ? `<p style="font-size: 12px;"><a href="${unsubscribeUrl}" style="font-size: 12px; color: ${BRAND_COLOR};">Unsubscribe</a> from these emails.</p>`
+      : "";
   return `
     ${content}
     ${footer}

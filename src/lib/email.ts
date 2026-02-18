@@ -20,15 +20,13 @@ import { getLumaEventUrl } from "@/lib/urls";
 let sesClient: SESClient | null = null;
 
 function getSES(): SESClient {
-  if (sesClient === null) {
-    sesClient = new SESClient({
-      region: env.AWS_REGION,
-      credentials: {
-        accessKeyId: env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-      },
-    });
-  }
+  sesClient ??= new SESClient({
+    region: env.AWS_REGION,
+    credentials: {
+      accessKeyId: env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+    },
+  });
   return sesClient;
 }
 
@@ -83,10 +81,6 @@ async function sendEmailIfEnabled({
 
   const ses = getSES();
   try {
-    // Extract email address from EMAIL_FROM format "Name <email@domain.com>" or just "email@domain.com"
-    const fromMatch = EMAIL_FROM.match(/<(.+)>/) ?? [null, EMAIL_FROM];
-    const fromEmail = fromMatch[1] ?? EMAIL_FROM;
-
     const params: SendEmailCommandInput = {
       Source: EMAIL_FROM,
       Destination: {
@@ -109,7 +103,7 @@ async function sendEmailIfEnabled({
     const command = new SendEmailCommand(params);
     const result = await ses.send(command);
 
-    if (!result.MessageId) {
+    if (result.MessageId === undefined || result.MessageId === "") {
       throw new Error(
         "SES API returned invalid response - email may not have been sent"
       );
@@ -148,7 +142,7 @@ export async function sendVerificationEmail(
   await sendEmailIfEnabled({
     to: email,
     subject: "Verify your Fractal Events subscription",
-    html: wrapInEmailTemplate(buildEmailBody(content, "#")),
+    html: wrapInEmailTemplate(buildEmailBody(content)),
   });
 
   await sendDiscordEmailLog({
@@ -377,7 +371,7 @@ export function getBasicEmailContent(
     <p>Here's what's coming up this week:</p>
     ${eventsText}
   `;
-  const body = buildEmailBody(content, "#");
+  const body = buildEmailBody(content);
   return {
     from: EMAIL_FROM,
     subject: `${isTest ? "[TEST] " : ""} Upcoming Fractal Events`,
@@ -394,7 +388,7 @@ export function getDetailedEmailContent(
     <p>Here's what's coming up this week:</p>
     ${detailedEventsHtml}
   `;
-  const body = buildEmailBody(content, "#");
+  const body = buildEmailBody(content);
   return {
     from: EMAIL_FROM,
     subject: `${isTest ? "[TEST] " : ""} Upcoming Fractal Events`,
@@ -436,7 +430,7 @@ export async function sendTestEmail(
     const command = new SendEmailCommand(params);
     const result = await ses.send(command);
 
-    if (!result.MessageId) {
+    if (result.MessageId === undefined || result.MessageId === "") {
       throw new Error(
         "SES API returned invalid response - email may not have been sent"
       );
