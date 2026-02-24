@@ -35,13 +35,16 @@ async function fetchEventsPage(
     throw new Error(`Response validation failed: ${parsed.error.message}`);
   }
 
-  // Filter to only entries that have the event property (valid LumaEvent entries)
-  // Validate each entry against the eventSchema to ensure it's a proper event
   const events: LumaEvent[] = [];
   for (const entry of parsed.data.entries) {
     const validated = eventSchema.safeParse(entry);
     if (validated.success) {
       events.push(validated.data);
+    } else {
+      const externalParsed = externalEventEntrySchema.safeParse(entry);
+      if (externalParsed.success) {
+        events.push(convertExternalEntryToLumaEvent(externalParsed.data));
+      }
     }
   }
 
@@ -72,8 +75,13 @@ export async function fetchUpcomingEvents(
   const addEvents = (events: LumaEvent[]): void => {
     for (const event of events) {
       if (!seenEventIds.has(event.api_id)) {
-        const eventStart = new Date(event.start_at);
-        if (eventStart >= windowStart && eventStart <= windowEnd) {
+        const startAt = getEventStartAt(event);
+        const eventStart = new Date(startAt);
+        if (
+          !Number.isNaN(eventStart.getTime()) &&
+          eventStart >= windowStart &&
+          eventStart <= windowEnd
+        ) {
           seenEventIds.add(event.api_id);
           allEvents.push(event);
         }
@@ -164,7 +172,7 @@ const geoAddressInfoSchema = z.object({
   address: z.string().optional(),
   country: z.string().optional(),
   place_id: z.string().optional(),
-  localized: z.unknown(),
+  localized: z.unknown().optional(),
   city_state: z.string(),
   description: z.string().optional(),
   sublocality: z.string().optional(),
@@ -325,7 +333,7 @@ const eventSchema = z.object({
   event: eventDetailSchema,
   cover_image: coverImageSchema,
   calendar: calendarSchema,
-  start_at: z.string(),
+  start_at: z.string().nullable(),
   hosts: z.array(hostSchema),
   guest_count: z.number(),
   ticket_count: z.number(),
@@ -351,7 +359,137 @@ const eventListSchema = z.object({
   pagination_cursor: z.string().nullable().optional(),
 });
 
+/** External/listed events on the calendar have a different shape (no top-level start_at, minimal event object). */
+const externalEventDetailSchema = z.object({
+  name: z.string(),
+  start_at: z.string(),
+  timezone: z.string(),
+  url: z.string(),
+  cover_url: z.string().optional(),
+  geo_address_info: geoAddressInfoSchema,
+  coordinate: coordinateSchema,
+  duration_interval: z.string().optional(),
+  geo_address_json: z.unknown().optional(),
+  host: z.unknown().nullable().optional(),
+});
+
+const externalEventEntrySchema = z.object({
+  api_id: z.string(),
+  calendar_api_id: z.string(),
+  platform: z.string(),
+  status: z.string(),
+  submitted_by_user_api_id: z.string(),
+  tags: z.array(z.unknown()),
+  is_manager: z.boolean(),
+  event: externalEventDetailSchema,
+  cover_image: coverImageSchema.optional(),
+  cover_image_url: z.string().optional(),
+});
+
+type ExternalEventEntry = z.infer<typeof externalEventEntrySchema>;
+
 export type LumaEvent = z.infer<typeof eventSchema>;
+
+/** Use top-level start_at when set; otherwise fall back to event.start_at (API sometimes returns null at top level). */
+export function getEventStartAt(event: LumaEvent): string {
+  return event.start_at ?? event.event.start_at;
+}
+
+function convertExternalEntryToLumaEvent(entry: ExternalEventEntry): LumaEvent {
+  const e = entry.event;
+  return {
+    api_id: entry.api_id,
+    event: {
+      api_id: entry.api_id,
+      calendar_api_id: entry.calendar_api_id,
+      cover_url: e.cover_url ?? entry.cover_image_url ?? "",
+      end_at: e.start_at,
+      event_type: "external",
+      hide_rsvp: false,
+      location_type: "offline",
+      name: e.name,
+      one_to_one: false,
+      recurrence_id: null,
+      show_guest_list: false,
+      start_at: e.start_at,
+      timezone: e.timezone,
+      url: e.url,
+      user_api_id: entry.submitted_by_user_api_id,
+      visibility: "public",
+      virtual_info: { has_access: false },
+      geo_address_info: e.geo_address_info,
+      geo_address_visibility: "public",
+      coordinate: e.coordinate,
+      waitlist_enabled: false,
+      waitlist_status: "disabled",
+    },
+    cover_image: {
+      vibrant_color: null,
+      colors: [],
+      palette: null,
+    },
+    calendar: {
+      access_level: "public",
+      api_id: "",
+      avatar_url: "",
+      coordinate: null,
+      cover_image_url: "",
+      description_short: null,
+      event_submission_restriction: "anyone",
+      geo_city: null,
+      geo_country: null,
+      geo_region: null,
+      google_measurement_id: null,
+      instagram_handle: null,
+      is_blocked: false,
+      launch_status: "launched",
+      linkedin_handle: null,
+      luma_plus_active: false,
+      meta_pixel_id: null,
+      name: "Fractal Boston",
+      personal_user_api_id: null,
+      refund_policy: null,
+      slug: null,
+      social_image_url: null,
+      stripe_account_id: null,
+      tax_config: null,
+      tiktok_handle: null,
+      timezone: null,
+      tint_color: "#000000",
+      track_meta_ads_from_luma: false,
+      twitter_handle: null,
+      verified_at: null,
+      website: null,
+      youtube_handle: null,
+      is_personal: false,
+      personal_user: null,
+    },
+    start_at: null,
+    hosts: [],
+    guest_count: 0,
+    ticket_count: 0,
+    ticket_info: {
+      price: null,
+      is_free: true,
+      max_price: null,
+      is_sold_out: false,
+      spots_remaining: null,
+      is_near_capacity: false,
+      require_approval: false,
+      currency_info: null,
+    },
+    featured_guests: [],
+    role: null,
+    waitlist_active: false,
+    featured_city: null,
+    calendar_api_id: entry.calendar_api_id,
+    is_manager: entry.is_manager,
+    platform: entry.platform,
+    status: entry.status,
+    submitted_by_user_api_id: entry.submitted_by_user_api_id,
+    tags: entry.tags,
+  };
+}
 
 const webhookEventSchema = z.object({
   api_id: z.string(),

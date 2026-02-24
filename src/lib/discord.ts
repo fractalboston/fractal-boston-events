@@ -1,4 +1,4 @@
-import type { LumaEvent } from "@/lib/luma";
+import { type LumaEvent, getEventStartAt } from "@/lib/luma";
 import { getLumaEventUrl } from "@/lib/urls";
 
 /** Discord message flag: do not include any embeds (including link previews). */
@@ -30,12 +30,14 @@ function formatEventsLikeEmail(events: LumaEvent[]): string {
     return "No events scheduled for this week.";
   }
   const sorted = [...events].sort(
-    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+    (a, b) =>
+      new Date(getEventStartAt(a)).getTime() -
+      new Date(getEventStartAt(b)).getTime()
   );
   return sorted
     .map(
       (event) =>
-        `**[${event.event.name}](${getLumaEventUrl(event.event.url)})**\n${formatEventDateLong(event.start_at)}`
+        `**[${event.event.name}](${getLumaEventUrl(event.event.url)})**\n${formatEventDateLong(getEventStartAt(event))}`
     )
     .join("\n\n");
 }
@@ -109,7 +111,7 @@ export async function sendDiscordNewEventAlert(
 ): Promise<void> {
   // Match email: "New Event Alert! 🚀" + "A new event was just added:" + event block + "RSVP Now" link
   const eventUrl = getLumaEventUrl(event.event.url);
-  const eventBlock = `**[${event.event.name}](${eventUrl})**\n${formatEventDateLong(event.start_at)}`;
+  const eventBlock = `**[${event.event.name}](${eventUrl})**\n${formatEventDateLong(getEventStartAt(event))}`;
   const payload: DiscordWebhookPayload = {
     content: `# New Event Alert! 🚀\n\nA new event was just added:\n\n${eventBlock}\n\n[RSVP Now](${eventUrl})`,
     embeds: [],

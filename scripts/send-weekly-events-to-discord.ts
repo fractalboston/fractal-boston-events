@@ -15,7 +15,8 @@ async function main(): Promise<void> {
   try {
     const { sendDiscordWeeklySummary } = await import("../src/lib/discord");
     const { env } = await import("../src/lib/env");
-    const { getReportableEvents } = await import("../src/lib/luma");
+    const { getEventStartAt, getReportableEvents } =
+      await import("../src/lib/luma");
 
     console.log("Fetching events from Luma...");
     const events = await getReportableEvents(env.LUMA_CALENDAR_ID);
@@ -28,7 +29,7 @@ async function main(): Promise<void> {
       console.log("Events:");
       events.forEach((event) => {
         console.log(
-          `  - ${event.event.name} (${new Date(event.start_at).toLocaleString()})`
+          `  - ${event.event.name} (${new Date(getEventStartAt(event)).toLocaleString()})`
         );
       });
     }

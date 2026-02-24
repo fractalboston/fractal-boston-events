@@ -4,10 +4,12 @@ import {
   DISCORD_URL,
   HOMEPAGE_URL,
 } from "@/lib/constants";
-import type { LumaEvent } from "@/lib/luma";
+import { type LumaEvent, getEventStartAt } from "@/lib/luma";
 import { getLumaEventUrl } from "@/lib/urls";
 
 const TIME_ZONE = "America/New_York";
+const EVENT_PLACEHOLDER_IMAGE_URL =
+  "https://fractal.boston/img/event-placeholder.jpg";
 
 export function formatEventDate(dateString: string): string {
   const date = new Date(dateString);
@@ -29,7 +31,7 @@ export function formatEventsSimpleHtml(events: LumaEvent[]): string {
   const eventItems = events
     .map(
       (event) =>
-        `<p><a href="${getLumaEventUrl(event.event.url)}">${event.event.name}</a><br>${formatEventDate(event.start_at)}</p>`
+        `<p><a href="${getLumaEventUrl(event.event.url)}">${event.event.name}</a><br>${formatEventDate(getEventStartAt(event))}</p>`
     )
     .join("");
 
@@ -44,20 +46,20 @@ export function generateEventsHtml(events: LumaEvent[]): string {
   const eventItems = events
     .map((event) => {
       const eventUrl = getLumaEventUrl(event.event.url);
+      const imageUrl = event.event.cover_url || EVENT_PLACEHOLDER_IMAGE_URL;
+      const imageCell = `<td style="width: 64px; padding-right: 16px; vertical-align: top;"><div style="width: 64px; height: 64px; border-radius: 4px; overflow: hidden; position: relative;"><img src="${imageUrl}" alt="${event.event.name}" width="64" height="64" style="width: 64px; height: 64px; object-fit: cover; border-radius: 4px; display: block; max-width: 100%;" /></div></td>`;
       return `
       <a href="${eventUrl}" style="display: block; text-decoration: none; color: inherit;">
         <div style="margin-bottom: 24px; padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
-              <td style="width: 64px; padding-right: 16px; vertical-align: top;">
-                ${event.event.cover_url ? `<div style="width: 64px; height: 64px; background-color: #f0f0f0; border-radius: 4px; overflow: hidden; position: relative;"><img src="${event.event.cover_url}" alt="${event.event.name}" width="64" height="64" style="width: 64px; height: 64px; object-fit: cover; border-radius: 4px; display: block; max-width: 100%;" /></div>` : '<div style="width: 64px; height: 64px; background-color: #f0f0f0; border-radius: 4px;"></div>'}
-              </td>
+              ${imageCell}
               <td style="vertical-align: top;">
                 <h3 style="margin: 0 0 8px 0; color: #1a1a1a;">
                   <span style="color: ${BRAND_COLOR};">${event.event.name}</span>
                 </h3>
                 <p style="margin: 0; color: #666; font-size: 14px;">
-                  📅 ${formatEventDate(event.start_at)}
+                  📅 ${formatEventDate(getEventStartAt(event))}
                 </p>
               </td>
             </tr>
