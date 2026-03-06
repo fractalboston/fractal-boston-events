@@ -43,7 +43,8 @@ async function fetchEventsPage(
     } else {
       const externalParsed = externalEventEntrySchema.safeParse(entry);
       if (externalParsed.success) {
-        events.push(convertExternalEntryToLumaEvent(externalParsed.data));
+        const converted = convertExternalEntryToLumaEvent(externalParsed.data);
+        events.push(converted);
       }
     }
   }
@@ -321,9 +322,9 @@ const eventDetailSchema = z.object({
   user_api_id: z.string(),
   visibility: z.string(),
   virtual_info: virtualInfoSchema,
-  geo_address_info: geoAddressInfoSchema,
+  geo_address_info: geoAddressInfoSchema.nullable(),
   geo_address_visibility: z.string(),
-  coordinate: coordinateSchema,
+  coordinate: coordinateSchema.nullable(),
   waitlist_enabled: z.boolean(),
   waitlist_status: z.string(),
 });
