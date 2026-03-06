@@ -213,11 +213,11 @@ export async function sendDiscordEmailLog(
   };
 
   const statusText = enabled
-    ? `Sent to ${String(recipientCount)} recipient${recipientCount === 1 ? "" : "s"}`
-    : `Would send to ${String(recipientCount)} recipient${recipientCount === 1 ? "" : "s"} (emailing disabled)`;
+    ? `sent to ${String(recipientCount)} recipient${recipientCount === 1 ? "" : "s"}`
+    : `would send to ${String(recipientCount)} recipient${recipientCount === 1 ? "" : "s"} (emailing disabled)`;
 
   const payload: DiscordWebhookPayload = {
-    content: `📧 **${emailTypeLabels[emailType]}**: ${statusText}`,
+    content: `📧 **${emailTypeLabels[emailType]}** ${statusText}`,
     embeds: [],
     flags: SUPPRESS_EMBEDS,
   };
@@ -246,7 +246,7 @@ export async function sendDiscordInfo(
 ): Promise<void> {
   const { webhookUrl, message, title } = params;
   const payload: DiscordWebhookPayload = {
-    content: `ℹ️ **${title ?? "Info"}**\n\n${message}`,
+    content: `ℹ**${title ?? "Info"}:** ${message}`,
     embeds: [],
     flags: SUPPRESS_EMBEDS,
   };

@@ -307,16 +307,16 @@ const virtualInfoSchema = z.object({
 });
 
 const geoAddressInfoSchema = z.object({
-  city: z.string(),
+  city: z.string().optional(),
   type: z.string().optional(),
   region: z.string().optional(),
   address: z.string().optional(),
   country: z.string().optional(),
   place_id: z.string().optional(),
   localized: z.unknown().optional(),
-  city_state: z.string(),
+  city_state: z.string().optional(),
   description: z.string().optional(),
-  sublocality: z.string().optional(),
+  sublocality: z.string().nullish(),
   country_code: z.string().optional(),
   full_address: z.string().optional(),
   short_address: z.string().optional(),
