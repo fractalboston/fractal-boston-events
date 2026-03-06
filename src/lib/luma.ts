@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { env } from "@/lib/env";
 
 async function fetchEventsPage(
   calendarId: string,
@@ -35,6 +36,25 @@ async function fetchEventsPage(
     throw new Error(`Response validation failed: ${parsed.error.message}`);
   }
 
+  const rawEventCandidates: unknown[] = [];
+  for (const entry of parsed.data.entries) {
+    if (entry === null || typeof entry !== "object") {
+      continue;
+    }
+    const maybeEvent = (entry as { event?: unknown }).event;
+    if (maybeEvent === null || typeof maybeEvent !== "object") {
+      continue;
+    }
+    const eventObj = maybeEvent as { name?: unknown; start_at?: unknown };
+    if (
+      typeof eventObj.name === "string" &&
+      typeof eventObj.start_at === "string"
+    ) {
+      rawEventCandidates.push(entry);
+    }
+  }
+  const expectedEventCount = rawEventCandidates.length;
+
   const events: LumaEvent[] = [];
   for (const entry of parsed.data.entries) {
     const validated = eventSchema.safeParse(entry);
@@ -47,6 +67,14 @@ async function fetchEventsPage(
         events.push(converted);
       }
     }
+  }
+
+  const parsedEventCount = events.length;
+  if (parsedEventCount !== expectedEventCount) {
+    await notifyLumaEventParsingDiscrepancy({
+      rawEntries: rawEventCandidates,
+      parsedEvents: events,
+    });
   }
 
   // Determine next cursor: use pagination_cursor if available, otherwise use last entry's api_id if has_more
@@ -151,6 +179,118 @@ export function isEventWithinNextWeek(event: { start_at: string }): boolean {
 
   return eventStart >= now && eventStart <= nextWeek;
 }
+
+async function notifyLumaEventParsingDiscrepancy({
+  rawEntries,
+  parsedEvents,
+}: {
+  rawEntries: unknown[];
+  parsedEvents: LumaEvent[];
+}): Promise<void> {
+  try {
+    const parsedIds = new Set(parsedEvents.map((event) => event.api_id));
+
+    const droppedEvents: {
+      apiId: string;
+      name: string;
+      startAt: string | null;
+      timezone?: string;
+    }[] = [];
+
+    for (const entry of rawEntries) {
+      if (entry === null || typeof entry !== "object") {
+        continue;
+      }
+
+      const typedEntry = entry as {
+        api_id?: unknown;
+        event?: { name?: unknown; start_at?: unknown; timezone?: unknown };
+      };
+
+      const apiId =
+        typeof typedEntry.api_id === "string" ? typedEntry.api_id : null;
+      if (apiId === null || parsedIds.has(apiId)) {
+        continue;
+      }
+
+      const event = typedEntry.event;
+      if (typeof event !== "object") {
+        continue;
+      }
+
+      const name = typeof event.name === "string" ? event.name : null;
+      const startAt =
+        typeof event.start_at === "string" ? event.start_at : null;
+      const timezone =
+        typeof event.timezone === "string" ? event.timezone : undefined;
+
+      if (name !== null) {
+        droppedEvents.push({
+          apiId,
+          name,
+          startAt,
+          timezone,
+        });
+      }
+    }
+
+    const contentLines: string[] = [];
+    contentLines.push("⚠️ **Luma event parsing discrepancy detected**");
+    contentLines.push(
+      `Expected ${String(rawEntries.length)} event-like entries from Luma, but only ${String(parsedEvents.length)} were parsed successfully.`
+    );
+
+    if (droppedEvents.length > 0) {
+      contentLines.push("");
+      contentLines.push("Dropped events (failed Zod parsing):");
+      for (const dropped of droppedEvents.slice(0, 10)) {
+        const when = dropped.startAt !== null ? ` at ${dropped.startAt}` : "";
+        const tz =
+          dropped.timezone !== undefined ? ` (${dropped.timezone})` : "";
+        contentLines.push(`• ${dropped.name}${when}${tz} [${dropped.apiId}]`);
+      }
+      if (droppedEvents.length > 10) {
+        contentLines.push(`…and ${String(droppedEvents.length - 10)} more.`);
+      }
+    }
+
+    await postDiscordLoggingMessage({ content: contentLines.join("\n") });
+  } catch (error) {
+    console.error(
+      "Failed to compute or send Luma event parsing discrepancy:",
+      error
+    );
+  }
+}
+
+async function postDiscordLoggingMessage({
+  content,
+}: {
+  content: string;
+}): Promise<void> {
+  try {
+    const response = await fetch(env.DISCORD_LOGGING_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content,
+        embeds: [],
+        // Suppress embeds so we don't get noisy link previews
+        flags: 1 << 2,
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(
+        `Luma Discord logging webhook error: ${String(response.status)} - ${text}`
+      );
+    }
+  } catch (error) {
+    console.error("Failed to send message to Discord logging webhook:", error);
+  }
+}
+
 // Zod schemas for the api2.luma.com/calendar/get-items response
 const coordinateSchema = z.object({
   longitude: z.number(),
