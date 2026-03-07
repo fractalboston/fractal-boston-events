@@ -54,9 +54,13 @@ export async function POST(request: Request): Promise<Response> {
 
     const event = convertWebhookEventToLumaEvent(webhookEvent);
 
+    const timePart =
+      event.start_at != null && event.start_at !== ""
+        ? ` (${event.start_at})`
+        : "";
     await sendDiscordInfo({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-      message: `New event created: "${event.event.name}" (${event.start_at})`,
+      message: `New event created: "${event.event.name}"${timePart}`,
       title: "Luma Event - Created",
     });
 
