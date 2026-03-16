@@ -40,3 +40,5 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
+
+.cursor/hooks/state
