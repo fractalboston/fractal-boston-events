@@ -1,17 +1,12 @@
-import { db } from "@/db/db";
-import {
-  notAllowed,
-  sendInternalError,
-  sendSuccess,
-  withHandler,
-} from "@/lib/api-response";
+import { sendInternalError, sendSuccess } from "@/lib/api-response";
 import { validateCronSecret } from "@/lib/auth";
+import { db } from "@/db/db";
 
 type KeepAliveResponse = {
   newSubscribersLastWeek: number;
 };
 
-export const GET = withHandler(async (): Promise<Response> => {
+export async function GET(): Promise<Response> {
   const authError = await validateCronSecret();
   if (authError !== null) {
     return authError;
@@ -23,20 +18,15 @@ export const GET = withHandler(async (): Promise<Response> => {
 
     const result = await db
       .selectFrom("subscribers")
-      .select((eb) => eb.fn.countAll<string>().as("count"))
+      .select((eb) => eb.fn.countAll<number>().as("count"))
       .where("created_at", ">=", oneWeekAgo)
       .executeTakeFirstOrThrow();
 
     return sendSuccess<KeepAliveResponse>({
-      newSubscribersLastWeek: parseInt(result.count, 10),
+      newSubscribersLastWeek: Number(result.count),
     });
   } catch (error) {
     console.error("Keep-alive cron error:", error);
     return sendInternalError("Failed to query subscribers");
   }
-});
-
-export const POST = notAllowed;
-export const PUT = notAllowed;
-export const PATCH = notAllowed;
-export const DELETE = notAllowed;
+}

@@ -1,9 +1,4 @@
-import {
-  notAllowed,
-  sendInternalError,
-  sendSuccess,
-  withHandler,
-} from "@/lib/api-response";
+import { sendInternalError, sendSuccess } from "@/lib/api-response";
 import { env } from "@/lib/env";
 import { type LumaEvent, getReportableEvents } from "@/lib/luma";
 
@@ -23,7 +18,7 @@ function parseAsOfDate(dateStr: string | null): Date | null {
   return date;
 }
 
-export const GET = withHandler(async (request: Request): Promise<Response> => {
+export async function GET(request: Request): Promise<Response> {
   try {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get("date");
@@ -38,9 +33,4 @@ export const GET = withHandler(async (request: Request): Promise<Response> => {
     console.error("Events API error:", err);
     return sendInternalError(`Failed to fetch events: ${err.message}`);
   }
-});
-
-export const POST = notAllowed;
-export const PUT = notAllowed;
-export const PATCH = notAllowed;
-export const DELETE = notAllowed;
+}

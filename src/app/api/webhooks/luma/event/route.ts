@@ -1,10 +1,8 @@
 import { ZodError } from "zod";
 import {
-  notAllowed,
   sendBadRequest,
   sendInternalError,
   sendSuccess,
-  withHandler,
 } from "@/lib/api-response";
 import { validateLumaWebhook } from "@/lib/auth";
 import {
@@ -26,12 +24,7 @@ type WebhookResponse = {
   emailsSent?: number;
 };
 
-export const GET = notAllowed;
-export const PUT = notAllowed;
-export const PATCH = notAllowed;
-export const DELETE = notAllowed;
-
-export const POST = withHandler(async (request: Request): Promise<Response> => {
+export async function POST(request: Request): Promise<Response> {
   const authError = await validateLumaWebhook();
   if (authError !== null) {
     return authError;
@@ -110,4 +103,4 @@ export const POST = withHandler(async (request: Request): Promise<Response> => {
 
     return sendInternalError("Failed to process webhook");
   }
-});
+}

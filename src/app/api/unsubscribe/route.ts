@@ -1,28 +1,21 @@
 import {
   type UnsubscribeResponse,
   handleOptionsRequest,
-  notAllowed,
   sendBadRequest,
   sendInternalError,
   sendNotFound,
   sendSuccess,
   unsubscribeBodySchema,
-  withHandler,
 } from "@/lib/api-response";
 import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { getSubscriberByToken, unsubscribe } from "@/lib/subscribers";
 
-export const GET = notAllowed;
-export const PUT = notAllowed;
-export const PATCH = notAllowed;
-export const DELETE = notAllowed;
-
-export const OPTIONS = withHandler((): Response => {
+export function OPTIONS(): Response {
   return handleOptionsRequest();
-});
+}
 
-export const POST = withHandler(async (request: Request): Promise<Response> => {
+export async function POST(request: Request): Promise<Response> {
   let body: unknown;
   try {
     body = await request.json();
@@ -86,4 +79,4 @@ export const POST = withHandler(async (request: Request): Promise<Response> => {
 
     return sendInternalError("Failed to unsubscribe");
   }
-});
+}

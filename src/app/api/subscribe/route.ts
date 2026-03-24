@@ -2,16 +2,13 @@ import { db } from "@/db/db";
 import {
   type SubscribeResponse,
   handleOptionsRequest,
-  notAllowed,
   sendBadRequest,
   sendCreated,
   sendInternalError,
   sendNotFound,
   sendSuccess,
   subscribeBodySchema,
-  withHandler,
 } from "@/lib/api-response";
-import { validateApiKey } from "@/lib/auth";
 import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendVerificationEmail } from "@/lib/email";
 import { env } from "@/lib/env";
@@ -22,21 +19,11 @@ import {
   verifySubscriber,
 } from "@/lib/subscribers";
 
-export const GET = notAllowed;
-export const PUT = notAllowed;
-export const PATCH = notAllowed;
-export const DELETE = notAllowed;
-
-export const OPTIONS = withHandler((): Response => {
+export function OPTIONS(): Response {
   return handleOptionsRequest();
-});
+}
 
-export const POST = withHandler(async (request: Request): Promise<Response> => {
-  const authError = await validateApiKey();
-  if (authError !== null) {
-    return authError;
-  }
-
+export async function POST(request: Request): Promise<Response> {
   let body: unknown;
   try {
     body = await request.json();
@@ -205,4 +192,4 @@ export const POST = withHandler(async (request: Request): Promise<Response> => {
 
     return sendInternalError("Failed to process subscription");
   }
-});
+}
