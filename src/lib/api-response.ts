@@ -107,6 +107,26 @@ function getCorsHeaders(): Record<string, string> {
   };
 }
 
+export function withHandler<T extends unknown[]>(
+  handler: (...args: T) => Promise<Response> | Response
+): (...args: T) => Promise<Response> {
+  return async (...args: T): Promise<Response> => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      console.error("Unhandled API error:", error);
+      return sendInternalError("An unexpected error occurred");
+    }
+  };
+}
+
+// Use as a named export for every HTTP method a route does not support,
+// so Next.js App Router returns JSON 405 instead of an empty response.
+export const notAllowed = withHandler(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  (_req?: Request) => sendMethodNotAllowed()
+);
+
 export function addCorsHeaders<T>(response: NextResponse<T>): NextResponse<T> {
   const headers = getCorsHeaders();
   for (const [key, value] of Object.entries(headers)) {

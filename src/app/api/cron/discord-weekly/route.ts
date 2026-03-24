@@ -1,4 +1,9 @@
-import { sendInternalError, sendSuccess } from "@/lib/api-response";
+import {
+  notAllowed,
+  sendInternalError,
+  sendSuccess,
+  withHandler,
+} from "@/lib/api-response";
 import { validateCronSecret } from "@/lib/auth";
 import { sendDiscordError, sendDiscordWeeklySummary } from "@/lib/discord";
 import { env } from "@/lib/env";
@@ -9,7 +14,7 @@ type CronResponse = {
   eventsCount: number;
 };
 
-export async function GET(): Promise<Response> {
+export const GET = withHandler(async (): Promise<Response> => {
   const authError = await validateCronSecret();
   if (authError !== null) {
     return authError;
@@ -43,4 +48,9 @@ export async function GET(): Promise<Response> {
 
     return sendInternalError("Failed to send events to Discord");
   }
-}
+});
+
+export const POST = notAllowed;
+export const PUT = notAllowed;
+export const PATCH = notAllowed;
+export const DELETE = notAllowed;

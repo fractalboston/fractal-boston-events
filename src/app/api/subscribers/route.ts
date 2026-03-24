@@ -1,10 +1,12 @@
 import { z } from "zod";
 import {
+  notAllowed,
   sendBadRequest,
   sendError,
   sendInternalError,
   sendNotFound,
   sendSuccess,
+  withHandler,
 } from "@/lib/api-response";
 import { isDevelopment } from "@/lib/env";
 import {
@@ -41,9 +43,9 @@ const listQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 
-export async function GET(request: Request): Promise<Response> {
+export const GET = withHandler(async (request: Request): Promise<Response> => {
   if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+    return sendNotFound("Not found");
   }
   try {
     const { searchParams } = new URL(request.url);
@@ -84,15 +86,15 @@ export async function GET(request: Request): Promise<Response> {
     console.error("Subscriber search error:", err);
     return sendInternalError(`Search failed: ${err.message}`);
   }
-}
+});
 
 const deleteBodySchema = z.object({
   id: z.string().min(1),
 });
 
-export async function POST(request: Request): Promise<Response> {
+export const POST = withHandler(async (request: Request): Promise<Response> => {
   if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+    return sendNotFound("Not found");
   }
   try {
     let body: unknown;
@@ -120,11 +122,11 @@ export async function POST(request: Request): Promise<Response> {
     console.error("Subscriber create error:", err);
     return sendInternalError(`Create failed: ${err.message}`);
   }
-}
+});
 
-export async function PUT(request: Request): Promise<Response> {
+export const PUT = withHandler(async (request: Request): Promise<Response> => {
   if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+    return sendNotFound("Not found");
   }
   try {
     let body: unknown;
@@ -156,31 +158,35 @@ export async function PUT(request: Request): Promise<Response> {
     console.error("Subscriber update error:", err);
     return sendInternalError(`Update failed: ${err.message}`);
   }
-}
+});
 
-export async function DELETE(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
-  }
-  try {
-    let body: unknown;
+export const DELETE = withHandler(
+  async (request: Request): Promise<Response> => {
+    if (!isDevelopment()) {
+      return sendNotFound("Not found");
+    }
     try {
-      body = await request.json();
-    } catch {
-      return sendBadRequest("Invalid JSON body");
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return sendBadRequest("Invalid JSON body");
+      }
+      const parsed = deleteBodySchema.safeParse(body);
+      if (!parsed.success) {
+        return sendBadRequest(parsed.error.message);
+      }
+      const deleted = await deleteSubscriber(parsed.data.id);
+      if (!deleted) {
+        return sendNotFound("Subscriber not found");
+      }
+      return sendSuccess({ deleted: true });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error("Subscriber delete error:", err);
+      return sendInternalError(`Delete failed: ${err.message}`);
     }
-    const parsed = deleteBodySchema.safeParse(body);
-    if (!parsed.success) {
-      return sendBadRequest(parsed.error.message);
-    }
-    const deleted = await deleteSubscriber(parsed.data.id);
-    if (!deleted) {
-      return sendNotFound("Subscriber not found");
-    }
-    return sendSuccess({ deleted: true });
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    console.error("Subscriber delete error:", err);
-    return sendInternalError(`Delete failed: ${err.message}`);
   }
-}
+);
+
+export const PATCH = notAllowed;

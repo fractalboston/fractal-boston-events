@@ -42,3 +42,4 @@ coverage/
 *.tsbuildinfo
 
 .cursor/hooks/state
+.claude/settings.local.json

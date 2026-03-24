@@ -1,8 +1,11 @@
 import { z } from "zod";
 import {
+  notAllowed,
   sendBadRequest,
   sendInternalError,
+  sendNotFound,
   sendSuccess,
+  withHandler,
 } from "@/lib/api-response";
 import { sendTestEmail } from "@/lib/email";
 import { isDevelopment } from "@/lib/env";
@@ -25,9 +28,14 @@ function parseAsOfDate(dateStr: string): Date {
   return new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
 }
 
-export async function POST(request: Request): Promise<Response> {
+export const GET = notAllowed;
+export const PUT = notAllowed;
+export const PATCH = notAllowed;
+export const DELETE = notAllowed;
+
+export const POST = withHandler(async (request: Request): Promise<Response> => {
   if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+    return sendNotFound("Not found");
   }
   try {
     let body: unknown;
@@ -62,4 +70,4 @@ export async function POST(request: Request): Promise<Response> {
     console.error("Test email route error:", err);
     return sendInternalError(`Failed to process request: ${err.message}`);
   }
-}
+});

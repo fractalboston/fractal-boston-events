@@ -246,7 +246,7 @@ export async function sendDiscordInfo(
 ): Promise<void> {
   const { webhookUrl, message, title } = params;
   const payload: DiscordWebhookPayload = {
-    content: `ℹ**${title ?? "Info"}:** ${message}`,
+    content: `**${title ?? "Info"}:** ${message}`,
     embeds: [],
     flags: SUPPRESS_EMBEDS,
   };

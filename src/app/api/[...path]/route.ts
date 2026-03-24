@@ -1,8 +1,8 @@
-import { sendNotFound } from "@/lib/api-response";
+import { sendNotFound, withHandler } from "@/lib/api-response";
 
-function handler(): ReturnType<typeof sendNotFound> {
+const handler = withHandler((): Response => {
   return sendNotFound("API route not found");
-}
+});
 
 export const GET = handler;
 export const POST = handler;

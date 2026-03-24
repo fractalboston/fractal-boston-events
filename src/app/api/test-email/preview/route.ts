@@ -1,4 +1,10 @@
-import { sendInternalError, sendSuccess } from "@/lib/api-response";
+import {
+  notAllowed,
+  sendInternalError,
+  sendNotFound,
+  sendSuccess,
+  withHandler,
+} from "@/lib/api-response";
 import {
   type EmailContent,
   getBasicEmailContent,
@@ -21,9 +27,14 @@ function parseAsOfDate(dateStr: string | null): Date | null {
   return date;
 }
 
-export async function GET(request: Request): Promise<Response> {
+export const POST = notAllowed;
+export const PUT = notAllowed;
+export const PATCH = notAllowed;
+export const DELETE = notAllowed;
+
+export const GET = withHandler(async (request: Request): Promise<Response> => {
   if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+    return sendNotFound("Not found");
   }
   try {
     const { searchParams } = new URL(request.url);
@@ -43,4 +54,4 @@ export async function GET(request: Request): Promise<Response> {
     console.error("Test email preview error:", err);
     return sendInternalError(`Failed to generate preview: ${err.message}`);
   }
-}
+});
