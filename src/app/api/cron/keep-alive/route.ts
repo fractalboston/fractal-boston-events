@@ -1,6 +1,6 @@
+import { db } from "@/db/db";
 import { sendInternalError, sendSuccess } from "@/lib/api-response";
 import { validateCronSecret } from "@/lib/auth";
-import { db } from "@/db/db";
 
 type KeepAliveResponse = {
   newSubscribersLastWeek: number;

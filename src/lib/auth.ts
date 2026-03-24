@@ -4,17 +4,6 @@ import { sendUnauthorized } from "@/lib/api-response";
 import type { ApiErrorResponse } from "@/lib/api-response";
 import { env } from "@/lib/env";
 
-export async function validateApiKey(): Promise<NextResponse<ApiErrorResponse> | null> {
-  const headersList = await headers();
-  const apiKey = headersList.get("x-api-key");
-
-  if (typeof apiKey !== "string" || apiKey !== env.SUBSCRIBE_API_KEY) {
-    return sendUnauthorized("Invalid or missing API key");
-  }
-
-  return null;
-}
-
 export async function validateCronSecret(): Promise<NextResponse<ApiErrorResponse> | null> {
   // In development, allow without secret
   if (process.env.NODE_ENV === "development") {

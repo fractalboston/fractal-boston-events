@@ -4,11 +4,7 @@ This API provides endpoints for managing email subscriptions to Fractal Boston e
 
 ## Base URL
 
-Production: `https://fb-events.vercel.app` (or your deployed URL)
-
-## Authentication
-
-Some endpoints require an API key in the `X-Api-Key` header. This key should be kept secret and only used server-side.
+Production: `https://fractal-boston-events.vercel.app` (or your deployed URL)
 
 ## CORS
 
@@ -19,8 +15,6 @@ All endpoints support CORS and allow requests from `https://fractal.boston`. Pre
 ### POST /api/subscribe
 
 Subscribe an email address to event notifications.
-
-**Authentication**: Required (`X-Api-Key` header)
 
 **Request Body**:
 ```json
@@ -53,7 +47,6 @@ Subscribe an email address to event notifications.
 
 **Error Responses**:
 - `400 Bad Request`: Invalid email address
-- `401 Unauthorized`: Missing or invalid API key
 - `500 Internal Server Error`: Server error
 
 **Example (fetch)**:
@@ -61,8 +54,7 @@ Subscribe an email address to event notifications.
 const response = await fetch('https://fb-events.vercel.app/api/subscribe', {
   method: 'POST',
   headers: {
-    'Content-Type': 'application/json',
-    'X-Api-Key': 'your-api-key-here'
+    'Content-Type': 'application/json'
   },
   body: JSON.stringify({ email: 'user@example.com' })
 });
@@ -218,8 +210,7 @@ async function handleSubscribe(email: string) {
     const response = await fetch('https://fb-events.vercel.app/api/subscribe', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': process.env.NEXT_PUBLIC_EVENTS_API_KEY
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email })
     });

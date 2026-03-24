@@ -18,6 +18,4 @@ process.env.DISCORD_MOD_ROLE_ID =
   process.env.DISCORD_MOD_ROLE_ID ?? "test-role-id";
 process.env.POSTGRES_URL =
   process.env.POSTGRES_URL ?? "postgresql://localhost:5432/test";
-process.env.SUBSCRIBE_API_KEY =
-  process.env.SUBSCRIBE_API_KEY ?? "test-subscribe-key";
 process.env.APP_URL = process.env.APP_URL ?? dummyUrl;

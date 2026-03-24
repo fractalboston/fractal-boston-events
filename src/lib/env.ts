@@ -10,7 +10,6 @@ export type Env = {
   DISCORD_LOGGING_WEBHOOK_URL: string;
   DISCORD_MOD_ROLE_ID: string;
   POSTGRES_URL: string;
-  SUBSCRIBE_API_KEY: string;
   APP_URL: string;
   EMAIL_ENABLED: boolean;
   SUBSTACK_API_KEY?: string;
@@ -35,7 +34,6 @@ const config: Env = {
     .asUrlString(),
   DISCORD_MOD_ROLE_ID: env.get("DISCORD_MOD_ROLE_ID").required().asString(),
   POSTGRES_URL: env.get("POSTGRES_URL").required().asString(),
-  SUBSCRIBE_API_KEY: env.get("SUBSCRIBE_API_KEY").required().asString(),
   APP_URL: env.get("APP_URL").required().asUrlString(),
   EMAIL_ENABLED: env.get("EMAIL_ENABLED").default("false").asBool(),
   SUBSTACK_API_KEY: env.get("SUBSTACK_API_KEY").asString(),

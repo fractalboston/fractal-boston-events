@@ -20,7 +20,7 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 │                    (Vercel + Supabase)                         │
 │                                                                 │
 │  Public Endpoints:                                              │
-│  • POST /api/subscribe      - requires X-Api-Key header        │
+│  • POST /api/subscribe      - email or token in body            │
 │  • POST /api/verify         - token in body                    │
 │  • POST /api/unsubscribe    - token in body                    │
 │                                                                 │
@@ -66,7 +66,6 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 
 | Mechanism             | Purpose                                           |
 | --------------------- | ------------------------------------------------- |
-| `SUBSCRIBE_API_KEY`   | Protects subscribe endpoint from spam             |
 | `LUMA_WEBHOOK_SECRET` | Validates incoming Luma webhooks                  |
 | `CRON_SECRET`         | Vercel-managed secret for cron authentication     |
 | UUID tokens           | Subscriber-specific tokens for verify/unsubscribe |
@@ -192,7 +191,7 @@ yarn format
 
 The main site needs to:
 
-1. **Subscribe form** - POST to `/api/subscribe` with `X-Api-Key` header
+1. **Subscribe form** - POST to `/api/subscribe`
 2. **Verify page** (`/verify`) - Reads `token` from URL, calls POST `/api/verify`
 3. **Unsubscribe page** (`/unsubscribe`) - Reads `token` from URL, calls POST `/api/unsubscribe`
 
@@ -203,7 +202,6 @@ const response = await fetch('https://fb-events.vercel.app/api/subscribe', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'X-Api-Key': process.env.NEXT_PUBLIC_EVENTS_API_KEY,
   },
   body: JSON.stringify({ email }),
 })
