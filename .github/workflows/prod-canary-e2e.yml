@@ -1,0 +1,35 @@
+name: Production Canary E2E
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+jobs:
+  prod-canary-e2e:
+    name: Run Production E2E Canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Run production canary script
+        env:
+          PROD_BASE_URL: ${{ vars.VERCEL_URL }}
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          NEYNAR_BASE_URL: https://email.neynar.ai
+          NEYNAR_USERNAME_PREFIX: fbcanary
+          CANARY_DB_WAIT_TIMEOUT_MS: "45000"
+        run: yarn tsx scripts/prodCanaryE2e.ts
