@@ -182,6 +182,33 @@ export async function sendWelcomeEmail(
   });
 }
 
+export async function sendAlreadySubscribedEmail(
+  email: string,
+  token: string,
+  appUrl: string
+): Promise<void> {
+  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+
+  const content = `
+    <h1 style="font-size: 24px; margin-bottom: 16px;">You're Subscribed</h1>
+    <p>You're already subscribed to Fractal Events.</p>
+    <p>Look for an events email on Monday.</p>
+  `;
+
+  await sendEmailIfEnabled({
+    to: email,
+    subject: "You're Subscribed",
+    html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
+  });
+
+  await sendDiscordEmailLog({
+    webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+    emailType: "already-subscribed",
+    recipientCount: 1,
+    enabled: env.EMAIL_ENABLED,
+  });
+}
+
 export async function sendWeeklyDigest(
   email: string,
   token: string,

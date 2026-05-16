@@ -10,7 +10,7 @@ import {
   subscribeBodySchema,
 } from "@/lib/api-response";
 import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
-import { sendVerificationEmail } from "@/lib/email";
+import { sendAlreadySubscribedEmail, sendVerificationEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import {
   createSubscriber,
@@ -47,6 +47,11 @@ export async function POST(request: Request): Promise<Response> {
         return sendNotFound("Token not found");
       }
       if (existing.status === "verified") {
+        await sendAlreadySubscribedEmail(
+          existing.email,
+          existing.token,
+          appUrl
+        );
         await sendDiscordInfo({
           webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
           message: "Subscription attempt for already verified email",
@@ -101,6 +106,11 @@ export async function POST(request: Request): Promise<Response> {
 
     if (existing !== undefined) {
       if (existing.status === "verified") {
+        await sendAlreadySubscribedEmail(
+          existing.email,
+          existing.token,
+          appUrl
+        );
         await sendDiscordInfo({
           webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
           message: "Subscription attempt for already verified email",
@@ -160,6 +170,9 @@ export async function POST(request: Request): Promise<Response> {
         return sendSuccess<SubscribeResponse>({
           message: "Verification email resent",
         });
+      }
+      if (existing?.status === "verified") {
+        await sendAlreadySubscribedEmail(email, existing.token, appUrl);
       }
       return sendSuccess<SubscribeResponse>({
         message: "Already subscribed",

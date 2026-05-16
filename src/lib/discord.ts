@@ -193,7 +193,12 @@ export async function sendDiscordEmailJobStats(
 
 export type SendDiscordEmailLogParams = {
   webhookUrl: string;
-  emailType: "verification" | "welcome" | "weekly" | "new-event";
+  emailType:
+    | "verification"
+    | "welcome"
+    | "weekly"
+    | "new-event"
+    | "already-subscribed";
   recipientCount: number;
   enabled: boolean;
 };
@@ -203,13 +208,14 @@ export async function sendDiscordEmailLog(
 ): Promise<void> {
   const { webhookUrl, emailType, recipientCount, enabled } = params;
   const emailTypeLabels: Record<
-    "verification" | "welcome" | "weekly" | "new-event",
+    "verification" | "welcome" | "weekly" | "new-event" | "already-subscribed",
     string
   > = {
     verification: "Verification Email",
     welcome: "Welcome Email",
     weekly: "Weekly Digest",
     "new-event": "New Event Alert",
+    "already-subscribed": "Already Subscribed Email",
   };
 
   const statusText = enabled
