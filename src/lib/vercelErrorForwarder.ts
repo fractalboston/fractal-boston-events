@@ -5,9 +5,6 @@ type ConsoleErrorFn = (...data: unknown[]) => void;
 
 const PATCH_FLAG = Symbol.for("fbEvents.vercelErrorForwarderPatched");
 const ORIGINAL_ERROR = Symbol.for("fbEvents.originalConsoleError");
-const PROCESS_HANDLERS_FLAG = Symbol.for(
-  "fbEvents.vercelProcessHandlersPatched"
-);
 const REPORT_ERROR_PATCH_FLAG = Symbol.for("fbEvents.vercelReportErrorPatched");
 const FORWARDING_COUNT_FLAG = Symbol.for("fbEvents.discordForwardingCount");
 const MAX_ERROR_TEXT_LENGTH = 1500;
@@ -40,7 +37,7 @@ function getOriginalConsoleError(): ConsoleErrorFn {
   return original ?? console.error.bind(console);
 }
 
-function toError(reason: unknown, fallback: string): Error {
+export function toError(reason: unknown, fallback: string): Error {
   if (reason instanceof Error) {
     return reason;
   }
@@ -110,52 +107,11 @@ function registerGlobalReportErrorHandler(): void {
   });
 }
 
-function registerProcessErrorHandlers(): void {
-  if (typeof process === "undefined") {
-    return;
-  }
-
-  if (Reflect.get(globalThis, PROCESS_HANDLERS_FLAG) === true) {
-    return;
-  }
-
-  Reflect.set(globalThis, PROCESS_HANDLERS_FLAG, true);
-
-  process.on("uncaughtException", (error: Error) => {
-    reportRuntimeErrorToDiscord({
-      error,
-      context: "Vercel uncaughtException",
-    });
-  });
-
-  process.on("unhandledRejection", (reason: unknown) => {
-    reportRuntimeErrorToDiscord({
-      error: toError(reason, "Unhandled promise rejection"),
-      context: "Vercel unhandledRejection",
-    });
-  });
-
-  process.on("warning", (warning: Error) => {
-    reportRuntimeErrorToDiscord({
-      error: warning,
-      context: "Vercel process warning",
-    });
-  });
-
-  process.on("multipleResolves", (type, _promise, value) => {
-    reportRuntimeErrorToDiscord({
-      error: toError(value, `Promise ${type}`),
-      context: `Vercel process multipleResolves (${type})`,
-    });
-  });
-}
-
 export function initializeVercelErrorForwarder(): void {
   if (env.VERCEL === undefined) {
     return;
   }
 
-  registerProcessErrorHandlers();
   registerGlobalReportErrorHandler();
 
   if (Reflect.get(console, PATCH_FLAG) === true) {

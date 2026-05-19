@@ -3,8 +3,14 @@ import {
   reportRuntimeErrorToDiscord,
 } from "@/lib/vercelErrorForwarder";
 
-export function register(): void {
+export async function register(): Promise<void> {
   initializeVercelErrorForwarder();
+
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { registerProcessErrorHandlers } =
+      await import("@/lib/vercelErrorForwarderNode");
+    registerProcessErrorHandlers();
+  }
 }
 
 export function onRequestError(

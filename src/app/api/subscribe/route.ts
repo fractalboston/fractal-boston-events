@@ -183,7 +183,7 @@ export async function POST(request: Request): Promise<Response> {
 
     await sendDiscordInfo({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-      message: "New subscription created",
+      message: `${subscriber.email} subscribed`,
       title: "Subscribe - New Subscriber",
     });
 
