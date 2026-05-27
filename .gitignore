@@ -41,3 +41,4 @@ coverage/
 
 .cursor/hooks/state
 .claude/settings.local.json
+.cursor/debug-*.log 
