@@ -6,25 +6,25 @@ alwaysApply: true
 
 ## Essential Commands
 
-- `yarn dev` - Start dev server (port 3002)
-- `yarn build` - Build for production
-- `yarn check` - Run types, format, lint, tests. **ALWAYS RUN OUTSIDE SANDBOX**
-- `yarn check:types` - Run type checks only
-- `yarn format` - Format code with Prettier (run after changes)
-- `yarn test` - Run tests with Vitest
-- `yarn lint` - Run ESLint
+- `pnpm dev` - Start dev server (port 3002)
+- `pnpm build` - Build for production
+- `pnpm check` - Run types, format, lint, tests. **ALWAYS RUN OUTSIDE SANDBOX**
+- `pnpm check:types` - Run type checks only
+- `pnpm format` - Format code with Prettier (run after changes)
+- `pnpm test` - Run tests with Vitest
+- `pnpm lint` - Run ESLint
 
-**Never use `npm` or `npx`. Always use `yarn`.**
+**Never use `npm` or `npx`. Always use `pnpm`.**
 
-**Do not run yarn commands in the sandbox** - they often fail due to missing .env.local access.
+**Do not run pnpm commands in the sandbox** - they often fail due to missing .env.local access.
 
 ## Automatic Formatting
 
-**CRITICAL: After making ANY file changes, you MUST run `yarn format` to format all modified files.**
+**CRITICAL: After making ANY file changes, you MUST run `pnpm format` to format all modified files.**
 
 This is a mandatory step that must happen after every response where files are edited. The workflow is:
 1. Make code changes
-2. **IMMEDIATELY run `yarn format`** to format the modified files
+2. **IMMEDIATELY run `pnpm format`** to format the modified files
 3. Only then consider the task complete
 
 Do not skip this step. Formatting ensures code consistency and prevents lint errors.

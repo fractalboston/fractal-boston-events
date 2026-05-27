@@ -4,12 +4,12 @@ async function main(): Promise<void> {
   const email = process.argv[2];
 
   if (email === undefined) {
-    console.error("Usage: yarn tsx scripts/send-test-email.ts <email>");
+    console.error("Usage: pnpm email:test <email>");
     process.exit(1);
   }
 
   if (email === "" || email.trim().length === 0) {
-    console.error("Usage: yarn tsx scripts/send-test-email.ts <email>");
+    console.error("Usage: pnpm email:test <email>");
     process.exit(1);
   }
 

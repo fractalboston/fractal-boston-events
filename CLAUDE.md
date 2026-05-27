@@ -59,7 +59,7 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 5. **env-var for environment variables** - NEVER use `process.env` directly, ALWAYS use `env` from `src/lib/env.ts`
 6. **Absolute imports only** - Use `@/` imports, NEVER use relative imports (`./` or `../`)
 7. **No React Server Components** - Classic Pages Router only
-8. **Yarn only** - No npm commands
+8. **pnpm only** - No npm or yarn commands
 9. **Prettier with import sorting** - Imports are automatically sorted using `@trivago/prettier-plugin-sort-imports`
 
 ### Security
@@ -158,25 +158,25 @@ Both webhooks need the `X-Luma-Signature` header set to your `LUMA_WEBHOOK_SECRE
 
 ```bash
 # Install dependencies
-yarn
+pnpm install
 
 # Run migrations
-yarn migrate
+pnpm migrate
 
 # Start dev server (with Turbopack)
-yarn dev
+pnpm dev
 
 # Run all checks (tests + lint + typecheck)
-yarn check
+pnpm check
 
 # Run tests
-yarn test
+pnpm test
 
 # Lint
-yarn lint
+pnpm lint
 
 # Format (with import sorting)
-yarn format
+pnpm format
 ```
 
 ## Deployment

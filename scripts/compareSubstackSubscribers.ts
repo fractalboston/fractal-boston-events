@@ -56,7 +56,7 @@ async function main(): Promise<void> {
 
   if (csvPath === undefined || csvPath === "") {
     console.error("Error: CSV path is required as first argument");
-    console.error("Usage: yarn compare:substack <path-to-csv>");
+    console.error("Usage: pnpm compare:substack <path-to-csv>");
     process.exit(1);
   }
 

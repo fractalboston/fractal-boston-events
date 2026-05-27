@@ -5,7 +5,7 @@
  * and send them to the Discord events webhook.
  *
  * Usage:
- *   yarn tsx scripts/send-weekly-events-to-discord.ts
+ *   pnpm tsx scripts/send-weekly-events-to-discord.ts
  */
 import { config } from "dotenv";
 

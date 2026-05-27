@@ -6,17 +6,17 @@ Event notification system for Fractal Boston. Sends weekly email digests and Dis
 
 ```bash
 # Install dependencies
-yarn
+pnpm install
 
 # Copy environment variables
 cp .env.example .env
 # Edit .env with your values
 
 # Run database migrations
-yarn migrate
+pnpm migrate
 
 # Start development server
-yarn dev
+pnpm dev
 ```
 
 ## Setup
@@ -32,8 +32,8 @@ See [AGENTS.md](./AGENTS.md) and [CLAUDE.md](./CLAUDE.md) for detailed setup ins
 ## Development
 
 ```bash
-yarn dev       # Start dev server
-yarn test      # Run tests
-yarn lint      # Lint code
-yarn format    # Format code
+pnpm dev       # Start dev server
+pnpm test      # Run tests
+pnpm lint      # Lint code
+pnpm format    # Format code
 ```

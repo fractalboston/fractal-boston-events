@@ -107,7 +107,7 @@ export AWS_REGION=us-east-1
 export EMAIL_ENABLED=true
 
 # Run test email script
-yarn email:test your-email@example.com
+pnpm email:test your-email@example.com
 ```
 
 ## Troubleshooting

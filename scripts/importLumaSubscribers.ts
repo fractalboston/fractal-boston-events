@@ -73,7 +73,7 @@ async function main(): Promise<void> {
 
   if (csvPath === undefined || csvPath === "") {
     console.error("Error: CSV path is required as first argument");
-    console.error("Usage: yarn import:luma <path-to-csv>");
+    console.error("Usage: pnpm import:luma <path-to-csv>");
     process.exit(1);
   }
 

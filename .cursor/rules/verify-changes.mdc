@@ -18,10 +18,10 @@ alwaysApply: true
 
 ### Automated Verification (Preferred)
 
-- Run existing checks: If `yarn check` exists, run that and it will do all the automated checks for you. If not, do as many of these as you can:
-  - Run tests: `yarn test`
-  - Check linter output: `yarn lint`
-  - Check type errors: `yarn check:types`
+- Run existing checks: If `pnpm check` exists, run that and it will do all the automated checks for you. If not, do as many of these as you can:
+  - Run tests: `pnpm test`
+  - Check linter output: `pnpm lint`
+  - Check type errors: `pnpm check:types`
   - Any other similar commands from package.json
 - Run the application and test the specific functionality
 
@@ -34,7 +34,7 @@ When you cannot verify automatically, provide clear steps:
 
 To verify this change works:
 
-1. Run `yarn dev` to start the development server
+1. Run `pnpm dev` to start the development server
 2. Navigate to [specific URL/page]
 3. [Perform specific action]
 4. Verify that [expected behavior] occurs
@@ -47,7 +47,7 @@ To verify this change works:
 
 ```typescript
 // Added new calculateTotal() function
-// Ran: yarn test -- calculateTotal
+// Ran: pnpm test -- calculateTotal
 // Result: All tests passing ✓
 // Verified: Function correctly handles edge cases
 ```
@@ -58,7 +58,7 @@ To verify this change works:
 Added new API endpoint for event subscriptions. 
 
 **Verification Steps:**
-1. Start the dev server: `yarn dev`
+1. Start the dev server: `pnpm dev`
 2. Make a POST request to `/api/subscribe` with a test email
 3. Verify that you receive a success response
 4. Check your email inbox for the verification email
