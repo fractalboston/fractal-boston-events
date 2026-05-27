@@ -340,7 +340,7 @@ const paletteSchema = z.object({
 });
 
 const coverImageSchema = z.object({
-  vibrant_color: z.unknown(),
+  vibrant_color: z.unknown().nullish(),
   colors: z.array(z.string()),
   palette: paletteSchema.nullable(),
 });
@@ -422,7 +422,7 @@ const featuredGuestSchema = z.object({
   bio_short: z.string().nullable(),
   instagram_handle: z.string().nullable(),
   is_verified: z.boolean(),
-  last_online_at: z.string(),
+  last_online_at: z.string().nullish(),
   linkedin_handle: z.string().nullable(),
   name: z.string(),
   tiktok_handle: z.unknown(),
@@ -441,7 +441,7 @@ const ticketInfoSchema = z.object({
   spots_remaining: z.number().nullable(),
   is_near_capacity: z.boolean(),
   require_approval: z.boolean(),
-  currency_info: z.unknown(),
+  currency_info: z.unknown().nullish(),
 });
 
 const eventDetailSchema = z.object({
@@ -508,7 +508,7 @@ const externalEventDetailSchema = z.object({
   url: z.string(),
   cover_url: z.string().optional(),
   geo_address_info: geoAddressInfoSchema,
-  coordinate: coordinateSchema,
+  coordinate: coordinateSchema.nullable(),
   duration_interval: z.string().optional(),
   geo_address_json: z.unknown().optional(),
   host: z.unknown().nullable().optional(),
