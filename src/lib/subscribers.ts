@@ -1,6 +1,11 @@
 import { sql } from "kysely";
 import { db } from "@/db/db";
 import type { Subscriber, SubscriberStatus } from "@/db/db";
+import {
+  isHexSubscriberToken,
+  isSubscriberUuid,
+  normalizeSubscriberTokenInput,
+} from "@/lib/subscriberToken";
 
 /** Escape \ % _ for use in a LIKE/ILIKE pattern with ESCAPE '\\'. */
 function escapeForLike(s: string): string {
@@ -50,30 +55,59 @@ export async function getSubscriberByEmail(
 export async function getSubscriberById(
   id: string
 ): Promise<Subscriber | undefined> {
+  const normalized = normalizeSubscriberTokenInput(id);
+  if (!isSubscriberUuid(normalized)) {
+    return undefined;
+  }
+
   return db
     .selectFrom("subscribers")
     .selectAll()
-    .where("id", "=", id)
+    .where("id", "=", normalized)
     .executeTakeFirst();
 }
 
 export async function getSubscriberByToken(
   token: string
 ): Promise<Subscriber | undefined> {
+  const normalized = normalizeSubscriberTokenInput(token);
+  if (!isHexSubscriberToken(normalized)) {
+    return undefined;
+  }
+
   return db
     .selectFrom("subscribers")
     .selectAll()
-    .where("token", "=", token)
+    .where("token", "=", normalized)
     .executeTakeFirst();
+}
+
+/** Resolves a hex token or subscriber UUID (e.g. id pasted from admin). */
+export async function resolveSubscriberByTokenOrId(
+  value: string
+): Promise<Subscriber | undefined> {
+  const normalized = normalizeSubscriberTokenInput(value);
+  if (isHexSubscriberToken(normalized)) {
+    return getSubscriberByToken(normalized);
+  }
+  if (isSubscriberUuid(normalized)) {
+    return getSubscriberById(normalized);
+  }
+  return undefined;
 }
 
 export async function verifySubscriber(
   token: string
 ): Promise<Subscriber | undefined> {
+  const normalized = normalizeSubscriberTokenInput(token);
+  if (!isHexSubscriberToken(normalized)) {
+    return undefined;
+  }
+
   const result = await db
     .updateTable("subscribers")
     .set({ status: "verified" })
-    .where("token", "=", token)
+    .where("token", "=", normalized)
     .where("status", "=", "pending")
     .returningAll()
     .executeTakeFirst();
@@ -84,10 +118,15 @@ export async function verifySubscriber(
 export async function unsubscribe(
   token: string
 ): Promise<Subscriber | undefined> {
+  const normalized = normalizeSubscriberTokenInput(token);
+  if (!isHexSubscriberToken(normalized)) {
+    return undefined;
+  }
+
   const result = await db
     .updateTable("subscribers")
     .set({ status: "unsubscribed" })
-    .where("token", "=", token)
+    .where("token", "=", normalized)
     .returningAll()
     .executeTakeFirst();
 
@@ -107,14 +146,18 @@ export async function getAllVerifiedSubscribers(): Promise<Subscriber[]> {
 export async function getVerifiedSubscribersByIds(
   ids: string[]
 ): Promise<Subscriber[]> {
-  if (ids.length === 0) {
+  const normalizedIds = ids
+    .map((id) => normalizeSubscriberTokenInput(id))
+    .filter(isSubscriberUuid);
+
+  if (normalizedIds.length === 0) {
     return [];
   }
 
   const results = await db
     .selectFrom("subscribers")
     .selectAll()
-    .where("id", "in", ids)
+    .where("id", "in", normalizedIds)
     .where("status", "=", "verified")
     .execute();
 
@@ -211,11 +254,16 @@ export async function updateSubscriber(
   if (input.email !== undefined) updates.email = input.email.toLowerCase();
   if (input.source !== undefined) updates.source = input.source;
   if (input.status !== undefined) updates.status = input.status;
+  const normalizedId = normalizeSubscriberTokenInput(input.id);
+  if (!isSubscriberUuid(normalizedId)) {
+    return undefined;
+  }
+
   if (Object.keys(updates).length === 0) {
     return db
       .selectFrom("subscribers")
       .selectAll()
-      .where("id", "=", input.id)
+      .where("id", "=", normalizedId)
       .executeTakeFirst();
   }
 
@@ -225,7 +273,7 @@ export async function updateSubscriber(
       .selectFrom("subscribers")
       .selectAll()
       .where("email", "=", input.email.toLowerCase())
-      .where("id", "!=", input.id)
+      .where("id", "!=", normalizedId)
       .executeTakeFirst();
     if (existing !== undefined) {
       return undefined; // Email conflict - API will return appropriate error
@@ -235,16 +283,21 @@ export async function updateSubscriber(
   const result = await db
     .updateTable("subscribers")
     .set(updates)
-    .where("id", "=", input.id)
+    .where("id", "=", normalizedId)
     .returningAll()
     .executeTakeFirst();
   return result;
 }
 
 export async function deleteSubscriber(id: string): Promise<boolean> {
+  const normalizedId = normalizeSubscriberTokenInput(id);
+  if (!isSubscriberUuid(normalizedId)) {
+    return false;
+  }
+
   const result = await db
     .deleteFrom("subscribers")
-    .where("id", "=", id)
+    .where("id", "=", normalizedId)
     .executeTakeFirst();
   return Number(result.numDeletedRows) > 0;
 }

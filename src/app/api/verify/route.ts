@@ -11,7 +11,10 @@ import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendWelcomeEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
-import { getSubscriberByToken, verifySubscriber } from "@/lib/subscribers";
+import {
+  resolveSubscriberByTokenOrId,
+  verifySubscriber,
+} from "@/lib/subscribers";
 
 export function OPTIONS(): Response {
   return handleOptionsRequest();
@@ -34,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
   const { token } = parsed.data;
 
   try {
-    const existing = await getSubscriberByToken(token);
+    const existing = await resolveSubscriberByTokenOrId(token);
 
     if (existing === undefined) {
       return sendNotFound("Token not found");
@@ -56,7 +59,7 @@ export async function POST(request: Request): Promise<Response> {
       return sendBadRequest("This email has been unsubscribed");
     }
 
-    const subscriber = await verifySubscriber(token);
+    const subscriber = await verifySubscriber(existing.token);
 
     if (subscriber === undefined) {
       return sendNotFound("Token not found or already verified");

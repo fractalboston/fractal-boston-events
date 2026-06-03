@@ -7,6 +7,7 @@ import {
   sendSuccess,
 } from "@/lib/api-response";
 import { isDevelopment } from "@/lib/env";
+import { subscriberIdParamSchema } from "@/lib/subscriberToken";
 import {
   createSubscriber,
   deleteSubscriber,
@@ -24,7 +25,7 @@ const createBodySchema = z.object({
 type CreateBody = z.infer<typeof createBodySchema>;
 
 const updateBodySchema = z.object({
-  id: z.string().min(1),
+  id: subscriberIdParamSchema,
   email: z.email().optional(),
   source: z.enum(["form", "luma", "substack", "manual"]).optional(),
   status: z.enum(["pending", "verified", "unsubscribed"]).optional(),
@@ -87,7 +88,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 const deleteBodySchema = z.object({
-  id: z.string().min(1),
+  id: subscriberIdParamSchema,
 });
 
 export async function POST(request: Request): Promise<Response> {

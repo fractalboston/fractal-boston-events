@@ -2,18 +2,19 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { HOMEPAGE_URL } from "@/lib/constants";
 import { isDevelopment } from "@/lib/env";
+import { subscriberTokenParamSchema } from "@/lib/subscriberToken";
 
 export const subscribeBodySchema = z.union([
   z.object({ email: z.email() }),
-  z.object({ token: z.string() }),
+  z.object({ token: subscriberTokenParamSchema }),
 ]);
 
 export const verifyBodySchema = z.object({
-  token: z.string(),
+  token: subscriberTokenParamSchema,
 });
 
 export const unsubscribeBodySchema = z.object({
-  token: z.string(),
+  token: subscriberTokenParamSchema,
 });
 
 export type SubscribeBody = z.infer<typeof subscribeBodySchema>;

@@ -15,7 +15,7 @@ import { env } from "@/lib/env";
 import {
   createSubscriber,
   getSubscriberByEmail,
-  getSubscriberByToken,
+  resolveSubscriberByTokenOrId,
   verifySubscriber,
 } from "@/lib/subscribers";
 
@@ -42,7 +42,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     if ("token" in parsed.data) {
       const { token } = parsed.data;
-      const existing = await getSubscriberByToken(token);
+      const existing = await resolveSubscriberByTokenOrId(token);
       if (existing === undefined) {
         return sendNotFound("Token not found");
       }
@@ -84,7 +84,7 @@ export async function POST(request: Request): Promise<Response> {
         }
       }
       if (existing.status === "pending") {
-        const verified = await verifySubscriber(token);
+        const verified = await verifySubscriber(existing.token);
         if (verified !== undefined) {
           await sendDiscordInfo({
             webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
