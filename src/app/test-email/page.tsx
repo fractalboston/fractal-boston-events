@@ -70,7 +70,13 @@ export default function TestEmailPage(): ReactElement {
   }, []);
 
   useEffect(() => {
-    void fetchPreview(asOfDate);
+    const timeoutId = window.setTimeout(() => {
+      void fetchPreview(asOfDate);
+    }, 0);
+
+    return (): void => {
+      window.clearTimeout(timeoutId);
+    };
   }, [asOfDate, fetchPreview]);
 
   async function handleSubmit(

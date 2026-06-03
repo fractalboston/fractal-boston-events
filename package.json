@@ -13,7 +13,7 @@
     "check:types": "tsc --noEmit",
     "test": "vitest run",
     "check": "pnpm run format:check && pnpm run lint && pnpm run check:types && pnpm run test",
-    "deploy": "vercel --prod",
+    "release": "pnpm check && vercel --prod",
     "migrate": "tsx src/db/migrate.ts",
     "migrate:down": "tsx src/db/migrate.ts --down",
     "db:test": "tsx scripts/test-db-connection.ts",

@@ -23,7 +23,7 @@ export async function GET(): Promise<Response> {
       .executeTakeFirstOrThrow();
 
     return sendSuccess<KeepAliveResponse>({
-      newSubscribersLastWeek: Number(result.count),
+      newSubscribersLastWeek: result.count,
     });
   } catch (error) {
     console.error("Keep-alive cron error:", error);

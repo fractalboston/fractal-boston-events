@@ -190,13 +190,19 @@ export default function SubscribersPage(): ReactElement {
   );
 
   useEffect(() => {
-    void runSearch({
-      q: debouncedQuery,
-      sortBy: sort,
-      status: statusFilter,
-      offset: 0,
-      append: false,
-    });
+    const timeoutId = window.setTimeout(() => {
+      void runSearch({
+        q: debouncedQuery,
+        sortBy: sort,
+        status: statusFilter,
+        offset: 0,
+        append: false,
+      });
+    }, 0);
+
+    return (): void => {
+      window.clearTimeout(timeoutId);
+    };
   }, [debouncedQuery, runSearch, sort, statusFilter]);
 
   const loadMore = useCallback((): void => {
