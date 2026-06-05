@@ -46,8 +46,8 @@ export async function POST(request: Request): Promise<Response> {
     if (existing.status === "verified") {
       await sendDiscordInfo({
         webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-        message: "Verification attempt for already verified email",
-        title: "Verify - Already Verified",
+        message: existing.email,
+        title: "Already Verified",
       });
       return sendSuccess<VerifyResponse>({
         message: "Already verified",
@@ -67,8 +67,8 @@ export async function POST(request: Request): Promise<Response> {
 
     await sendDiscordInfo({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-      message: "Email verified successfully",
-      title: "Verify - Success",
+      message: subscriber.email,
+      title: "Verified",
     });
 
     try {

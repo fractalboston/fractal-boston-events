@@ -199,14 +199,14 @@ export type SendDiscordEmailLogParams = {
     | "weekly"
     | "new-event"
     | "already-subscribed";
-  recipientCount: number;
+  recipients: string[];
   enabled: boolean;
 };
 
 export async function sendDiscordEmailLog(
   params: SendDiscordEmailLogParams
 ): Promise<void> {
-  const { webhookUrl, emailType, recipientCount, enabled } = params;
+  const { webhookUrl, emailType, recipients, enabled } = params;
   const emailTypeLabels: Record<
     "verification" | "welcome" | "weekly" | "new-event" | "already-subscribed",
     string
@@ -218,9 +218,14 @@ export async function sendDiscordEmailLog(
     "already-subscribed": "Already Subscribed Email",
   };
 
+  const recipientText =
+    recipients.length <= 3
+      ? recipients.join(", ")
+      : `${String(recipients.length)} recipients`;
+
   const statusText = enabled
-    ? `sent to ${String(recipientCount)} recipient${recipientCount === 1 ? "" : "s"}`
-    : `would send to ${String(recipientCount)} recipient${recipientCount === 1 ? "" : "s"} (emailing disabled)`;
+    ? `sent to ${recipientText}`
+    : `would send to ${recipientText} (emailing disabled)`;
 
   const payload: DiscordWebhookPayload = {
     content: `📧 **${emailTypeLabels[emailType]}** ${statusText}`,
@@ -252,7 +257,7 @@ export async function sendDiscordInfo(
 ): Promise<void> {
   const { webhookUrl, message, title } = params;
   const payload: DiscordWebhookPayload = {
-    content: `**${title ?? "Info"}:** ${message}`,
+    content: title !== undefined ? `**${title}:** ${message}` : message,
     embeds: [],
     flags: SUPPRESS_EMBEDS,
   };

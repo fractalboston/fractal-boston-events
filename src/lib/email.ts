@@ -144,13 +144,6 @@ export async function sendVerificationEmail(
     subject: "Verify your Fractal Events subscription",
     html: wrapInEmailTemplate(buildEmailBody(content)),
   });
-
-  await sendDiscordEmailLog({
-    webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-    emailType: "verification",
-    recipientCount: 1,
-    enabled: env.EMAIL_ENABLED,
-  });
 }
 
 export async function sendWelcomeEmail(
@@ -177,7 +170,7 @@ export async function sendWelcomeEmail(
   await sendDiscordEmailLog({
     webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
     emailType: "welcome",
-    recipientCount: 1,
+    recipients: [email],
     enabled: env.EMAIL_ENABLED,
   });
 }
@@ -204,7 +197,7 @@ export async function sendAlreadySubscribedEmail(
   await sendDiscordEmailLog({
     webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
     emailType: "already-subscribed",
-    recipientCount: 1,
+    recipients: [email],
     enabled: env.EMAIL_ENABLED,
   });
 }
@@ -237,7 +230,7 @@ export async function sendWeeklyDigest(
     await sendDiscordEmailLog({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
       emailType: "weekly",
-      recipientCount: 1,
+      recipients: [email],
       enabled: env.EMAIL_ENABLED,
     });
   }
@@ -273,7 +266,7 @@ export async function sendNewEventAlert(
     await sendDiscordEmailLog({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
       emailType: "new-event",
-      recipientCount: 1,
+      recipients: [email],
       enabled: env.EMAIL_ENABLED,
     });
   }
@@ -376,7 +369,7 @@ export async function sendBatchEmails({
   await sendDiscordEmailLog({
     webhookUrl,
     emailType,
-    recipientCount: success,
+    recipients: successfulEmails,
     enabled: emailEnabled,
   });
 

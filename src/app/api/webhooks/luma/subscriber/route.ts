@@ -41,8 +41,8 @@ export async function POST(request: Request): Promise<Response> {
     if (subscriber === undefined) {
       await sendDiscordInfo({
         webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-        message: "Luma subscriber webhook: subscriber already exists",
-        title: "Luma Subscriber - Already Exists",
+        message: email,
+        title: "Luma Subscriber Already Exists",
       });
       return sendSuccess<WebhookResponse>({
         message: "Subscriber already exists",
@@ -51,8 +51,8 @@ export async function POST(request: Request): Promise<Response> {
 
     await sendDiscordInfo({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-      message: "New Luma subscriber added",
-      title: "Luma Subscriber - Added",
+      message: email,
+      title: "New Luma Subscriber",
     });
 
     try {

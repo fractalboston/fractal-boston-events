@@ -54,8 +54,8 @@ export async function POST(request: Request): Promise<Response> {
         );
         await sendDiscordInfo({
           webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-          message: "Subscription attempt for already verified email",
-          title: "Subscribe - Already Verified",
+          message: existing.email,
+          title: "Already Verified",
         });
         return sendSuccess<SubscribeResponse>({
           message: "Already subscribed",
@@ -75,8 +75,7 @@ export async function POST(request: Request): Promise<Response> {
           await sendVerificationEmail(existing.email, existing.token, appUrl);
           await sendDiscordInfo({
             webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-            message: "Verification email resent to unsubscribed address",
-            title: "Subscribe - Verification Resent",
+            message: `Verification email sent to ${existing.email}`,
           });
           return sendSuccess<SubscribeResponse>({
             message: "Verification email sent",
@@ -88,8 +87,8 @@ export async function POST(request: Request): Promise<Response> {
         if (verified !== undefined) {
           await sendDiscordInfo({
             webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-            message: "Subscriber verified via token",
-            title: "Subscribe - Verified via Token",
+            message: existing.email,
+            title: "Verified via Token",
           });
           return sendSuccess<SubscribeResponse>({
             message: "Subscription confirmed",
@@ -113,8 +112,8 @@ export async function POST(request: Request): Promise<Response> {
         );
         await sendDiscordInfo({
           webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-          message: "Subscription attempt for already verified email",
-          title: "Subscribe - Already Verified",
+          message: existing.email,
+          title: "Already Verified",
         });
         return sendSuccess<SubscribeResponse>({
           message: "Already subscribed",
@@ -135,8 +134,7 @@ export async function POST(request: Request): Promise<Response> {
           await sendVerificationEmail(existing.email, existing.token, appUrl);
           await sendDiscordInfo({
             webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-            message: "Verification email resent to unsubscribed address",
-            title: "Subscribe - Verification Resent",
+            message: `Verification email sent to ${existing.email}`,
           });
           return sendSuccess<SubscribeResponse>({
             message: "Verification email sent",
@@ -148,8 +146,7 @@ export async function POST(request: Request): Promise<Response> {
         await sendVerificationEmail(email, existing.token, appUrl);
         await sendDiscordInfo({
           webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-          message: "Verification email resent",
-          title: "Subscribe - Verification Resent",
+          message: `Verification email sent to ${email}`,
         });
         return sendSuccess<SubscribeResponse>({
           message: "Verification email resent",
@@ -167,6 +164,10 @@ export async function POST(request: Request): Promise<Response> {
       const existing = await getSubscriberByEmail(email);
       if (existing?.status === "pending") {
         await sendVerificationEmail(email, existing.token, appUrl);
+        await sendDiscordInfo({
+          webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
+          message: `Verification email sent to ${email}`,
+        });
         return sendSuccess<SubscribeResponse>({
           message: "Verification email resent",
         });
@@ -183,8 +184,7 @@ export async function POST(request: Request): Promise<Response> {
 
     await sendDiscordInfo({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-      message: `${subscriber.email} subscribed`,
-      title: "Subscribe - New Subscriber",
+      message: `Verification email sent to ${email}`,
     });
 
     return sendCreated<SubscribeResponse>({
