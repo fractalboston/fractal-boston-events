@@ -33,11 +33,11 @@ export async function up(db: Kysely<Database>): Promise<void> {
       col.notNull().defaultTo(sql`now()`)
     )
     .addColumn("email", "varchar(255)", (col) => col.notNull().unique())
-    .addColumn("token", "varchar(32)", (col) =>
+    .addColumn("token", "uuid", (col) =>
       col
         .notNull()
         .unique()
-        .defaultTo(sql`lower(encode(gen_random_bytes(16), 'hex'))`)
+        .defaultTo(sql`gen_random_uuid()`)
     )
     .addColumn("status", "varchar(20)", (col) =>
       col.notNull().defaultTo("pending")

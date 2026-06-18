@@ -2,8 +2,9 @@ import { sql } from "kysely";
 import { db } from "@/db/db";
 import type { Subscriber, SubscriberStatus } from "@/db/db";
 import {
-  isHexSubscriberToken,
-  isSubscriberUuid,
+  isSubscriberId,
+  isSubscriberToken,
+  normalizeSubscriberIdInput,
   normalizeSubscriberTokenInput,
 } from "@/lib/subscriberToken";
 
@@ -52,11 +53,12 @@ export async function getSubscriberByEmail(
     .executeTakeFirst();
 }
 
+/** Internal admin lookup by subscriber id. Never use in public subscription flows. */
 export async function getSubscriberById(
   id: string
 ): Promise<Subscriber | undefined> {
-  const normalized = normalizeSubscriberTokenInput(id);
-  if (!isSubscriberUuid(normalized)) {
+  const normalized = normalizeSubscriberIdInput(id);
+  if (!isSubscriberId(normalized)) {
     return undefined;
   }
 
@@ -71,7 +73,7 @@ export async function getSubscriberByToken(
   token: string
 ): Promise<Subscriber | undefined> {
   const normalized = normalizeSubscriberTokenInput(token);
-  if (!isHexSubscriberToken(normalized)) {
+  if (!isSubscriberToken(normalized)) {
     return undefined;
   }
 
@@ -82,25 +84,11 @@ export async function getSubscriberByToken(
     .executeTakeFirst();
 }
 
-/** Resolves a hex token or subscriber UUID (e.g. id pasted from admin). */
-export async function resolveSubscriberByTokenOrId(
-  value: string
-): Promise<Subscriber | undefined> {
-  const normalized = normalizeSubscriberTokenInput(value);
-  if (isHexSubscriberToken(normalized)) {
-    return getSubscriberByToken(normalized);
-  }
-  if (isSubscriberUuid(normalized)) {
-    return getSubscriberById(normalized);
-  }
-  return undefined;
-}
-
 export async function verifySubscriber(
   token: string
 ): Promise<Subscriber | undefined> {
   const normalized = normalizeSubscriberTokenInput(token);
-  if (!isHexSubscriberToken(normalized)) {
+  if (!isSubscriberToken(normalized)) {
     return undefined;
   }
 
@@ -119,7 +107,7 @@ export async function unsubscribe(
   token: string
 ): Promise<Subscriber | undefined> {
   const normalized = normalizeSubscriberTokenInput(token);
-  if (!isHexSubscriberToken(normalized)) {
+  if (!isSubscriberToken(normalized)) {
     return undefined;
   }
 
@@ -147,8 +135,8 @@ export async function getVerifiedSubscribersByIds(
   ids: string[]
 ): Promise<Subscriber[]> {
   const normalizedIds = ids
-    .map((id) => normalizeSubscriberTokenInput(id))
-    .filter(isSubscriberUuid);
+    .map((id) => normalizeSubscriberIdInput(id))
+    .filter(isSubscriberId);
 
   if (normalizedIds.length === 0) {
     return [];
@@ -254,8 +242,8 @@ export async function updateSubscriber(
   if (input.email !== undefined) updates.email = input.email.toLowerCase();
   if (input.source !== undefined) updates.source = input.source;
   if (input.status !== undefined) updates.status = input.status;
-  const normalizedId = normalizeSubscriberTokenInput(input.id);
-  if (!isSubscriberUuid(normalizedId)) {
+  const normalizedId = normalizeSubscriberIdInput(input.id);
+  if (!isSubscriberId(normalizedId)) {
     return undefined;
   }
 
@@ -290,8 +278,8 @@ export async function updateSubscriber(
 }
 
 export async function deleteSubscriber(id: string): Promise<boolean> {
-  const normalizedId = normalizeSubscriberTokenInput(id);
-  if (!isSubscriberUuid(normalizedId)) {
+  const normalizedId = normalizeSubscriberIdInput(id);
+  if (!isSubscriberId(normalizedId)) {
     return false;
   }
 

@@ -15,7 +15,7 @@ import { env } from "@/lib/env";
 import {
   createSubscriber,
   getSubscriberByEmail,
-  resolveSubscriberByTokenOrId,
+  getSubscriberByToken,
   verifySubscriber,
 } from "@/lib/subscribers";
 
@@ -42,7 +42,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     if ("token" in parsed.data) {
       const { token } = parsed.data;
-      const existing = await resolveSubscriberByTokenOrId(token);
+      const existing = await getSubscriberByToken(token);
       if (existing === undefined) {
         return sendNotFound("Token not found");
       }

@@ -9,7 +9,7 @@ import {
 } from "@/lib/api-response";
 import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { env } from "@/lib/env";
-import { resolveSubscriberByTokenOrId, unsubscribe } from "@/lib/subscribers";
+import { getSubscriberByToken, unsubscribe } from "@/lib/subscribers";
 
 export function OPTIONS(): Response {
   return handleOptionsRequest();
@@ -32,7 +32,7 @@ export async function POST(request: Request): Promise<Response> {
   const { token } = parsed.data;
 
   try {
-    const existing = await resolveSubscriberByTokenOrId(token);
+    const existing = await getSubscriberByToken(token);
 
     if (!existing) {
       return sendNotFound("Token not found");

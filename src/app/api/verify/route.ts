@@ -11,10 +11,7 @@ import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendWelcomeEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
-import {
-  resolveSubscriberByTokenOrId,
-  verifySubscriber,
-} from "@/lib/subscribers";
+import { getSubscriberByToken, verifySubscriber } from "@/lib/subscribers";
 
 export function OPTIONS(): Response {
   return handleOptionsRequest();
@@ -37,7 +34,7 @@ export async function POST(request: Request): Promise<Response> {
   const { token } = parsed.data;
 
   try {
-    const existing = await resolveSubscriberByTokenOrId(token);
+    const existing = await getSubscriberByToken(token);
 
     if (existing === undefined) {
       return sendNotFound("Token not found");
