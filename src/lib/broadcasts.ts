@@ -7,7 +7,7 @@ import type {
   SenderIdentity,
 } from "@/db/db";
 import { SENDER_EMAIL_DOMAIN } from "@/lib/constants";
-import { buildEmailBody, wrapInEmailTemplate } from "@/lib/emailTemplates";
+import { wrapInBroadcastTemplate } from "@/lib/emailTemplates";
 
 export function isAllowedSenderEmail(email: string): boolean {
   const normalized = email.trim().toLowerCase();
@@ -39,7 +39,7 @@ export function buildBroadcastHtml({
   content: string;
   unsubscribeUrl: string;
 }): string {
-  return wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl));
+  return wrapInBroadcastTemplate({ content, unsubscribeUrl });
 }
 
 /**

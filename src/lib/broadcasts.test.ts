@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildBroadcastHtml,
   canSendBroadcast,
   editClearsTestApproval,
   formatSenderFrom,
@@ -7,6 +8,63 @@ import {
   isAllowedSenderEmail,
   resolveBroadcastFinalStatus,
 } from "@/lib/broadcasts";
+import { joinAppUrl } from "@/lib/urls";
+
+describe("joinAppUrl", () => {
+  it("joins a base URL without a trailing slash", () => {
+    expect(joinAppUrl("https://fractal.boston", "/unsubscribe?token=x")).toBe(
+      "https://fractal.boston/unsubscribe?token=x"
+    );
+  });
+
+  it("strips the trailing slash env-var adds to APP_URL", () => {
+    expect(joinAppUrl("https://fractal.boston/", "/unsubscribe?token=x")).toBe(
+      "https://fractal.boston/unsubscribe?token=x"
+    );
+  });
+
+  it("strips repeated trailing slashes", () => {
+    expect(joinAppUrl("https://fractal.boston//", "/verify?token=x")).toBe(
+      "https://fractal.boston/verify?token=x"
+    );
+  });
+});
+
+describe("buildBroadcastHtml", () => {
+  const html = buildBroadcastHtml({
+    content: "<p>Party on the roof deck.</p>",
+    unsubscribeUrl: "https://fractal.boston/unsubscribe?token=x",
+  });
+
+  it("includes the body content", () => {
+    expect(html).toContain("<p>Party on the roof deck.</p>");
+  });
+
+  it("includes the unsubscribe link", () => {
+    expect(html).toContain('href="https://fractal.boston/unsubscribe?token=x"');
+  });
+
+  it("includes the brand header link", () => {
+    expect(html).toContain('href="https://fractal.boston"');
+    expect(html).toContain("Fractal Boston");
+  });
+
+  it("uses a fixed-width table attribute for Outlook with a fluid max-width", () => {
+    expect(html).toContain('width="600"');
+    expect(html).toContain("max-width: 600px");
+  });
+
+  it("applies brand-green bold underlined defaults to content links", () => {
+    expect(html).toMatch(
+      /a\s*\{\s*color:\s*#059669;\s*font-weight:\s*bold;\s*text-decoration:\s*underline;/
+    );
+  });
+
+  it("provides a site-style button class", () => {
+    expect(html).toContain(".button");
+    expect(html).toContain("background-color: #059669");
+  });
+});
 
 describe("isAllowedSenderEmail", () => {
   it("accepts addresses at the sender domain", () => {
