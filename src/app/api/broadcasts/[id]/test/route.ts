@@ -16,6 +16,7 @@ import {
 import { sendDiscordInfo } from "@/lib/discord";
 import { sendBroadcastTestEmail } from "@/lib/email";
 import { env, isDevelopment } from "@/lib/env";
+import { joinAppUrl } from "@/lib/urls";
 
 const idSchema = z.guid("Invalid broadcast id");
 
@@ -61,7 +62,7 @@ export async function POST(
 
     const html = buildBroadcastHtml({
       content: broadcast.content,
-      unsubscribeUrl: `${env.APP_URL}/unsubscribe?token=test`,
+      unsubscribeUrl: joinAppUrl(env.APP_URL, "/unsubscribe?token=test"),
     });
     const subject = formatTestSubject(broadcast.subject);
 

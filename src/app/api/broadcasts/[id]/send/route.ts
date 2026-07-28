@@ -28,6 +28,7 @@ import {
 import { sendDiscordInfo } from "@/lib/discord";
 import { SESQuotaError, sendBroadcastEmail } from "@/lib/email";
 import { env, isDevelopment } from "@/lib/env";
+import { joinAppUrl } from "@/lib/urls";
 
 const idSchema = z.guid("Invalid broadcast id");
 
@@ -120,7 +121,10 @@ export async function POST(
       }
 
       try {
-        const unsubscribeUrl = `${env.APP_URL}/unsubscribe?token=${recipient.subscriberToken}`;
+        const unsubscribeUrl = joinAppUrl(
+          env.APP_URL,
+          `/unsubscribe?token=${recipient.subscriberToken}`
+        );
         const html = buildBroadcastHtml({
           content: claimed.content,
           unsubscribeUrl,

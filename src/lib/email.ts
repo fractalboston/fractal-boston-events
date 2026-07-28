@@ -15,7 +15,7 @@ import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 import type { LumaEvent } from "@/lib/luma";
 import { updateLastEmailedAt } from "@/lib/subscribers";
-import { getLumaEventUrl } from "@/lib/urls";
+import { getLumaEventUrl, joinAppUrl } from "@/lib/urls";
 
 let sesClient: SESClient | null = null;
 
@@ -180,7 +180,7 @@ export async function sendVerificationEmail(
   token: string,
   appUrl: string
 ): Promise<void> {
-  const verifyUrl = `${appUrl}/verify?token=${token}`;
+  const verifyUrl = joinAppUrl(appUrl, `/verify?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">Verify your subscription</h1>
@@ -206,7 +206,7 @@ export async function sendWelcomeEmail(
   events: LumaEvent[],
   appUrl: string
 ): Promise<void> {
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+  const unsubscribeUrl = joinAppUrl(appUrl, `/unsubscribe?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">Welcome to Fractal! 🎉</h1>
@@ -234,7 +234,7 @@ export async function sendAlreadySubscribedEmail(
   token: string,
   appUrl: string
 ): Promise<void> {
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+  const unsubscribeUrl = joinAppUrl(appUrl, `/unsubscribe?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">You're Subscribed</h1>
@@ -263,7 +263,7 @@ export async function sendWeeklyDigest(
   appUrl: string,
   skipLogging = false
 ): Promise<void> {
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+  const unsubscribeUrl = joinAppUrl(appUrl, `/unsubscribe?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">This Week at Fractal</h1>
@@ -297,7 +297,7 @@ export async function sendNewEventAlert(
   appUrl: string,
   skipLogging = false
 ): Promise<void> {
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+  const unsubscribeUrl = joinAppUrl(appUrl, `/unsubscribe?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">New Event Alert! 🚀</h1>

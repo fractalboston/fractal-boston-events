@@ -14,6 +14,7 @@ import {
   updateBroadcastDraft,
 } from "@/lib/broadcasts";
 import { env, isDevelopment } from "@/lib/env";
+import { joinAppUrl } from "@/lib/urls";
 
 const idSchema = z.guid("Invalid broadcast id");
 
@@ -47,7 +48,7 @@ export async function GET(
     ]);
     const previewHtml = buildBroadcastHtml({
       content: broadcast.content,
-      unsubscribeUrl: `${env.APP_URL}/unsubscribe?token=preview`,
+      unsubscribeUrl: joinAppUrl(env.APP_URL, "/unsubscribe?token=preview"),
     });
     return sendSuccess({
       broadcast,
