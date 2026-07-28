@@ -7,7 +7,12 @@ type Degenerate<T> = {
   [K in keyof T]: T[K] extends Generated<infer U> ? U : T[K];
 };
 
-export type SubscriberStatus = "pending" | "verified" | "unsubscribed";
+export type SubscriberStatus =
+  | "pending"
+  | "verified"
+  | "unsubscribed"
+  | "bounced"
+  | "complained";
 
 export type SubscribersTable = {
   id: Generated<string>;
@@ -18,11 +23,64 @@ export type SubscribersTable = {
   status: SubscriberStatus;
   source: "form" | "luma" | "substack" | "manual";
   last_emailed_at: Date | null;
+  last_broadcast_at: Date | null;
 };
 export type Subscriber = Degenerate<SubscribersTable>;
 
+export type SenderIdentitiesTable = {
+  id: Generated<string>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  name: string;
+  email: string;
+  reply_to: string | null;
+};
+export type SenderIdentity = Degenerate<SenderIdentitiesTable>;
+
+export type BroadcastStatus = "draft" | "sending" | "sent" | "failed";
+
+export type BroadcastsTable = {
+  id: Generated<string>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  subject: string;
+  content: string;
+  status: Generated<BroadcastStatus>;
+  sender_identity_id: string;
+  test_sent_to: string | null;
+  test_sent_at: Date | null;
+  sent_at: Date | null;
+  sent_from: string | null;
+  sent_reply_to: string | null;
+  recipient_count: number | null;
+  success_count: number | null;
+  failed_count: number | null;
+};
+export type Broadcast = Degenerate<BroadcastsTable>;
+
+export type BroadcastRecipientStatus =
+  | "pending"
+  | "sent"
+  | "failed"
+  | "skipped";
+
+export type BroadcastRecipientsTable = {
+  id: Generated<string>;
+  created_at: Generated<Date>;
+  broadcast_id: string;
+  subscriber_id: string | null;
+  email: string;
+  status: Generated<BroadcastRecipientStatus>;
+  error: string | null;
+  sent_at: Date | null;
+};
+export type BroadcastRecipient = Degenerate<BroadcastRecipientsTable>;
+
 export type Database = {
   subscribers: SubscribersTable;
+  sender_identities: SenderIdentitiesTable;
+  broadcasts: BroadcastsTable;
+  broadcast_recipients: BroadcastRecipientsTable;
 };
 
 // Strip sslmode from URL so Pool's ssl config (rejectUnauthorized: false) is used.
