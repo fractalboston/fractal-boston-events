@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
-import { BRAND_COLOR, SENDER_EMAIL_DOMAIN } from "@/lib/constants";
+import {
+  BRAND_COLOR,
+  EMAIL_FONT_STACK,
+  SENDER_EMAIL_DOMAIN,
+} from "@/lib/constants";
 
 type SenderIdentity = {
   id: string;
@@ -116,6 +120,17 @@ const STATUS_COLORS: Record<BroadcastStatus, { bg: string; fg: string }> = {
   failed: { bg: "#fee2e2", fg: "#991b1b" },
 };
 
+type WizardStep = 1 | 2 | 3 | 4;
+
+const WIZARD_STEPS: { step: WizardStep; label: string }[] = [
+  { step: 1, label: "Compose" },
+  { step: 2, label: "Preview" },
+  { step: 3, label: "Test send" },
+  { step: 4, label: "Send" },
+];
+
+type WizardStepState = "current" | "done" | "todo" | "locked";
+
 export default function BroadcastsPage(): ReactElement {
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [verifiedCount, setVerifiedCount] = useState(0);
@@ -130,6 +145,8 @@ export default function BroadcastsPage(): ReactElement {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
+  const [showFormattingGuide, setShowFormattingGuide] = useState(false);
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
   const [senderIdentityId, setSenderIdentityId] = useState("");
@@ -228,6 +245,7 @@ export default function BroadcastsPage(): ReactElement {
     setMessage(null);
     setDeleteArmed(false);
     setConfirmCount("");
+    setWizardStep(1);
     void loadDetail(broadcast.id);
   }
 
@@ -241,15 +259,13 @@ export default function BroadcastsPage(): ReactElement {
     setMessage(null);
     setDeleteArmed(false);
     setConfirmCount("");
+    setWizardStep(1);
   }
 
-  async function handleSave(
-    e: Parameters<React.SubmitEventHandler<HTMLFormElement>>[0]
-  ): Promise<void> {
-    e.preventDefault();
+  async function saveDraft(): Promise<Broadcast | null> {
     if (senderIdentityId === "") {
       setMessage({ type: "error", text: "Choose a sender identity." });
-      return;
+      return null;
     }
     setSaveLoading(true);
     setMessage(null);
@@ -266,18 +282,54 @@ export default function BroadcastsPage(): ReactElement {
       const data = (await response.json()) as BroadcastResponse;
       if (data.success && data.data?.broadcast !== undefined) {
         setSelectedId(data.data.broadcast.id);
-        setMessage({ type: "success", text: "Draft saved." });
         await loadDetail(data.data.broadcast.id);
         void loadList();
-      } else {
-        setMessage({ type: "error", text: data.error ?? "Save failed" });
+        return data.data.broadcast;
       }
+      setMessage({ type: "error", text: data.error ?? "Save failed" });
+      return null;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       setMessage({ type: "error", text: err.message });
+      return null;
     } finally {
       setSaveLoading(false);
     }
+  }
+
+  async function handleSave(
+    e: Parameters<React.SubmitEventHandler<HTMLFormElement>>[0]
+  ): Promise<void> {
+    e.preventDefault();
+    const saved = await saveDraft();
+    if (saved !== null) {
+      setMessage({ type: "success", text: "Draft saved." });
+      setWizardStep(2);
+    }
+  }
+
+  /**
+   * Forward navigation auto-saves a dirty compose step so the preview and
+   * test steps always reflect what would actually be sent.
+   */
+  async function goToStep(target: WizardStep): Promise<void> {
+    if (target === wizardStep) return;
+    if (target < wizardStep) {
+      setWizardStep(target);
+      return;
+    }
+    let current = detail?.broadcast ?? null;
+    const dirty =
+      subject !== current?.subject ||
+      content !== current.content ||
+      senderIdentityId !== current.sender_identity_id;
+    if (wizardStep === 1 && dirty) {
+      current = await saveDraft();
+      if (current === null) return;
+    }
+    if (current === null) return;
+    const max: WizardStep = current.test_sent_at !== null ? 4 : 3;
+    setWizardStep(target <= max ? target : max);
   }
 
   async function handleDelete(): Promise<void> {
@@ -475,6 +527,20 @@ export default function BroadcastsPage(): ReactElement {
     (broadcast.status === "draft" || broadcast.status === "failed") &&
     broadcast.test_sent_at !== null;
   const sendConfirmed = confirmCount.trim() === String(verifiedCount);
+  const isDirty =
+    subject !== broadcast?.subject ||
+    content !== broadcast.content ||
+    senderIdentityId !== broadcast.sender_identity_id;
+  const maxUnlockedStep: WizardStep =
+    broadcast === null || !isDraft
+      ? 1
+      : broadcast.test_sent_at !== null
+        ? 4
+        : 3;
+  const senderIdentity = identities.find(
+    (identity) =>
+      identity.id === (broadcast?.sender_identity_id ?? senderIdentityId)
+  );
 
   const style = {
     page: {
@@ -625,6 +691,109 @@ export default function BroadcastsPage(): ReactElement {
       verticalAlign: "top" as const,
     },
     hint: { fontSize: "13px", color: "#6b7280", marginTop: "8px" },
+    guideRow: { marginBottom: "20px" },
+    codeBlock: {
+      display: "block",
+      fontFamily: "monospace",
+      fontSize: "12px",
+      backgroundColor: "#f9fafb",
+      border: "1px solid #e5e7eb",
+      borderRadius: "6px",
+      padding: "8px 10px",
+      marginBottom: "8px",
+      whiteSpace: "pre-wrap" as const,
+      color: "#374151",
+    },
+    exampleBox: {
+      backgroundColor: "#f0fdf4",
+      borderRadius: "8px",
+      padding: "14px 16px",
+      fontFamily: EMAIL_FONT_STACK,
+      fontSize: "16px",
+      color: "#444444",
+    },
+    guideHeading: (fontSize: string): CSSProperties => ({
+      color: BRAND_COLOR,
+      fontFamily: EMAIL_FONT_STACK,
+      fontWeight: "bold",
+      lineHeight: 1.3,
+      fontSize,
+    }),
+    guideLink: {
+      color: BRAND_COLOR,
+      fontWeight: "bold",
+      textDecoration: "underline",
+    },
+    guideButton: {
+      display: "inline-block",
+      backgroundColor: BRAND_COLOR,
+      color: "#ffffff",
+      fontWeight: "bold",
+      textDecoration: "none",
+      padding: "12px 28px",
+      border: `3px solid ${BRAND_COLOR}`,
+      borderRadius: "50px 15px / 15px 50px",
+      boxShadow: "4px 4px 0 rgba(5, 150, 105, 0.3)",
+    },
+    stepperRow: {
+      display: "flex",
+      alignItems: "center",
+      flexWrap: "wrap" as const,
+      padding: "14px 16px",
+      borderBottom: "1px solid #e5e7eb",
+    },
+    stepItem: (clickable: boolean): CSSProperties => ({
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      cursor: clickable ? "pointer" : "default",
+    }),
+    stepCircle: (state: WizardStepState): CSSProperties => ({
+      width: "22px",
+      height: "22px",
+      borderRadius: "9999px",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "12px",
+      fontWeight: "600",
+      backgroundColor:
+        state === "current"
+          ? BRAND_COLOR
+          : state === "done"
+            ? "#d1fae5"
+            : state === "todo"
+              ? "#ffffff"
+              : "#f3f4f6",
+      color:
+        state === "current"
+          ? "#ffffff"
+          : state === "done"
+            ? "#065f46"
+            : state === "todo"
+              ? BRAND_COLOR
+              : "#9ca3af",
+      border:
+        state === "todo" ? `1px solid ${BRAND_COLOR}` : "1px solid transparent",
+    }),
+    stepLabel: (state: WizardStepState): CSSProperties => ({
+      fontSize: "13px",
+      fontWeight: state === "current" ? "600" : "500",
+      color:
+        state === "current"
+          ? "#111111"
+          : state === "locked"
+            ? "#9ca3af"
+            : "#374151",
+    }),
+    stepConnector: {
+      width: "20px",
+      height: "1px",
+      backgroundColor: "#e5e7eb",
+      margin: "0 8px",
+    },
+    summaryRow: { marginBottom: "8px", fontSize: "13px", color: "#374151" },
+    summaryKey: { color: "#6b7280", marginRight: "8px" },
   };
 
   return (
@@ -634,9 +803,10 @@ export default function BroadcastsPage(): ReactElement {
       </Link>
       <h1 style={style.h1}>Broadcasts</h1>
       <p style={style.description}>
-        Compose and send one-off emails to all verified subscribers.
-        Unsubscribed, bounced, and complained addresses are excluded
-        automatically. A test send is required before sending to the list.
+        Send one-off emails to all verified subscribers — unsubscribed, bounced,
+        and complained addresses are excluded automatically. Each broadcast goes
+        through compose → preview → test send → send. Broadcasts send
+        immediately; there is no scheduling.
       </p>
 
       {!emailEnabled && !listLoading && (
@@ -719,127 +889,488 @@ export default function BroadcastsPage(): ReactElement {
           <div style={style.cardHeader}>
             {selectedId === null ? "New broadcast" : "Edit draft"}
           </div>
-          <div style={style.cardBody}>
-            <form
-              onSubmit={(e) => {
-                void handleSave(e);
-              }}
-            >
-              <div style={{ marginBottom: "12px" }}>
-                <label htmlFor="broadcast-subject" style={style.label}>
-                  Subject
-                </label>
-                <input
-                  id="broadcast-subject"
-                  type="text"
-                  value={subject}
-                  onChange={(e) => {
-                    setSubject(e.target.value);
-                  }}
-                  required
-                  maxLength={255}
-                  disabled={saveLoading}
-                  style={{ ...style.input, width: "100%" }}
-                  placeholder="Subject line"
-                />
-              </div>
-              <div style={{ marginBottom: "12px" }}>
-                <label htmlFor="broadcast-sender" style={style.label}>
-                  Sender
-                </label>
-                <select
-                  id="broadcast-sender"
-                  value={senderIdentityId}
-                  onChange={(e) => {
-                    setSenderIdentityId(e.target.value);
-                  }}
-                  disabled={saveLoading}
-                  style={{ ...style.input, width: "100%", maxWidth: "420px" }}
+          <div style={style.stepperRow}>
+            {WIZARD_STEPS.map(({ step, label }, index) => {
+              const unlocked = step <= maxUnlockedStep;
+              const clickable = unlocked || wizardStep === 1;
+              const isCurrent = wizardStep === step;
+              const isDone =
+                !isCurrent &&
+                ((step === 1 && broadcast !== null && !isDirty) ||
+                  (step === 2 && wizardStep > 2) ||
+                  (step === 3 &&
+                    broadcast !== null &&
+                    broadcast.test_sent_at !== null));
+              const state: WizardStepState = isCurrent
+                ? "current"
+                : isDone
+                  ? "done"
+                  : unlocked
+                    ? "todo"
+                    : "locked";
+              return (
+                <Fragment key={step}>
+                  {index > 0 && <span style={style.stepConnector} />}
+                  <span
+                    role="button"
+                    tabIndex={clickable ? 0 : -1}
+                    onClick={() => {
+                      if (clickable) void goToStep(step);
+                    }}
+                    onKeyDown={(e) => {
+                      if (clickable && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        void goToStep(step);
+                      }
+                    }}
+                    style={style.stepItem(clickable)}
+                  >
+                    <span style={style.stepCircle(state)}>
+                      {isDone ? "✓" : String(step)}
+                    </span>
+                    <span style={style.stepLabel(state)}>{label}</span>
+                  </span>
+                </Fragment>
+              );
+            })}
+          </div>
+          {wizardStep === 1 && (
+            <div style={style.cardBody}>
+              <form
+                onSubmit={(e) => {
+                  void handleSave(e);
+                }}
+              >
+                <div style={{ marginBottom: "12px" }}>
+                  <label htmlFor="broadcast-subject" style={style.label}>
+                    Subject
+                  </label>
+                  <input
+                    id="broadcast-subject"
+                    type="text"
+                    value={subject}
+                    onChange={(e) => {
+                      setSubject(e.target.value);
+                    }}
+                    required
+                    maxLength={255}
+                    disabled={saveLoading}
+                    style={{ ...style.input, width: "100%" }}
+                    placeholder="Subject line"
+                  />
+                </div>
+                <div style={{ marginBottom: "12px" }}>
+                  <label htmlFor="broadcast-sender" style={style.label}>
+                    Sender
+                  </label>
+                  <select
+                    id="broadcast-sender"
+                    value={senderIdentityId}
+                    onChange={(e) => {
+                      setSenderIdentityId(e.target.value);
+                    }}
+                    disabled={saveLoading}
+                    style={{ ...style.input, width: "100%", maxWidth: "420px" }}
+                  >
+                    {identities.map((identity) => (
+                      <option key={identity.id} value={identity.id}>
+                        {identity.name} &lt;{identity.email}&gt;
+                        {identity.reply_to !== null
+                          ? ` · replies to ${identity.reply_to}`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ marginBottom: "12px" }}>
+                  <label htmlFor="broadcast-content" style={style.label}>
+                    Content (HTML)
+                  </label>
+                  <textarea
+                    id="broadcast-content"
+                    value={content}
+                    onChange={(e) => {
+                      setContent(e.target.value);
+                    }}
+                    required
+                    disabled={saveLoading}
+                    style={style.textarea}
+                    placeholder="<p>Hello Fractal…</p>"
+                  />
+                  <p style={style.hint}>
+                    This is the body of the email. The template adds the Fractal
+                    Boston header, content card, and a footer with site links
+                    and a per-subscriber unsubscribe link automatically —
+                    you&apos;ll see the full email in the Preview step. Links
+                    default to bold underlined emerald and headings to emerald
+                    unless your HTML overrides them; use{" "}
+                    <code>class=&quot;button&quot;</code> on a link for a
+                    site-style green button.
+                  </p>
+                </div>
+                <div
+                  style={{ display: "flex", gap: "12px", alignItems: "center" }}
                 >
-                  {identities.map((identity) => (
-                    <option key={identity.id} value={identity.id}>
-                      {identity.name} &lt;{identity.email}&gt;
-                      {identity.reply_to !== null
-                        ? ` · replies to ${identity.reply_to}`
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ marginBottom: "12px" }}>
-                <label htmlFor="broadcast-content" style={style.label}>
-                  Content (HTML)
-                </label>
-                <textarea
-                  id="broadcast-content"
-                  value={content}
-                  onChange={(e) => {
-                    setContent(e.target.value);
-                  }}
-                  required
-                  disabled={saveLoading}
-                  style={style.textarea}
-                  placeholder="<p>Hello Fractal…</p>"
-                />
-                <p style={style.hint}>
-                  The standard footer (site links and a per-subscriber
-                  unsubscribe link) is added automatically.
-                </p>
-              </div>
+                  <button
+                    type="submit"
+                    disabled={saveLoading}
+                    style={style.button(saveLoading)}
+                  >
+                    {saveLoading ? "Saving…" : "Save & continue to preview"}
+                  </button>
+                  {isDraft && !deleteArmed && (
+                    <button
+                      type="button"
+                      disabled={deleteLoading}
+                      onClick={() => {
+                        setDeleteArmed(true);
+                      }}
+                      style={style.dangerButton(deleteLoading)}
+                    >
+                      Delete draft
+                    </button>
+                  )}
+                  {isDraft && deleteArmed && (
+                    <button
+                      type="button"
+                      disabled={deleteLoading}
+                      onClick={() => {
+                        void handleDelete();
+                      }}
+                      style={{
+                        ...style.button(deleteLoading),
+                        backgroundColor: "#dc2626",
+                      }}
+                    >
+                      {deleteLoading ? "Deleting…" : "Confirm delete"}
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          )}
+
+          {wizardStep === 2 && detail !== null && (
+            <div>
               <div
-                style={{ display: "flex", gap: "12px", alignItems: "center" }}
+                style={{
+                  padding: "12px 16px",
+                  borderBottom: "1px solid #e5e7eb",
+                  fontSize: "13px",
+                  color: "#6b7280",
+                }}
+              >
+                This is exactly what recipients will receive — including the
+                header, footer, and unsubscribe link the template adds.
+              </div>
+              <div dangerouslySetInnerHTML={{ __html: detail.previewHtml }} />
+              <div
+                style={{
+                  ...style.cardBody,
+                  display: "flex",
+                  gap: "12px",
+                  borderTop: "1px solid #e5e7eb",
+                }}
               >
                 <button
-                  type="submit"
-                  disabled={saveLoading}
-                  style={style.button(saveLoading)}
+                  type="button"
+                  onClick={() => {
+                    void goToStep(1);
+                  }}
+                  style={style.secondaryButton(false)}
                 >
-                  {saveLoading
-                    ? "Saving…"
-                    : selectedId === null
-                      ? "Create draft"
-                      : "Save draft"}
+                  ← Back to compose
                 </button>
-                {isDraft && !deleteArmed && (
-                  <button
-                    type="button"
-                    disabled={deleteLoading}
-                    onClick={() => {
-                      setDeleteArmed(true);
-                    }}
-                    style={style.dangerButton(deleteLoading)}
-                  >
-                    Delete draft
-                  </button>
-                )}
-                {isDraft && deleteArmed && (
-                  <button
-                    type="button"
-                    disabled={deleteLoading}
-                    onClick={() => {
-                      void handleDelete();
-                    }}
-                    style={{
-                      ...style.button(deleteLoading),
-                      backgroundColor: "#dc2626",
-                    }}
-                  >
-                    {deleteLoading ? "Deleting…" : "Confirm delete"}
-                  </button>
-                )}
-                {broadcast?.test_sent_at != null && (
-                  <span style={{ fontSize: "13px", color: "#065f46" }}>
-                    ✓ Test sent to {broadcast.test_sent_to}
-                  </span>
-                )}
-                {broadcast !== null && broadcast.test_sent_at === null && (
-                  <span style={{ fontSize: "13px", color: "#92400e" }}>
-                    Test send required before sending
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    void goToStep(3);
+                  }}
+                  style={style.button(false)}
+                >
+                  Looks good — continue to test send
+                </button>
               </div>
-            </form>
+            </div>
+          )}
+
+          {wizardStep === 3 && broadcast !== null && (
+            <div style={style.cardBody}>
+              <p style={{ ...style.hint, marginTop: 0, marginBottom: "16px" }}>
+                A test send to your own inbox is required before the real send.
+                The subject is prefixed with [TEST]. Test emails are always
+                delivered, even in dry-run mode — check formatting and links on
+                desktop and mobile before continuing.
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-end",
+                  flexWrap: "wrap",
+                  marginBottom: "16px",
+                }}
+              >
+                <div>
+                  <label htmlFor="test-email" style={style.label}>
+                    Test send to
+                  </label>
+                  <input
+                    id="test-email"
+                    type="email"
+                    value={testEmail}
+                    onChange={(e) => {
+                      setTestEmail(e.target.value);
+                    }}
+                    disabled={testLoading}
+                    placeholder="your@email.com"
+                    style={{ ...style.input, width: "240px" }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={testLoading || testEmail.trim() === ""}
+                  onClick={() => {
+                    void handleTestSend();
+                  }}
+                  style={style.button(testLoading || testEmail.trim() === "")}
+                >
+                  {testLoading ? "Sending…" : "Send test email"}
+                </button>
+              </div>
+              {broadcast.test_sent_at !== null ? (
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "#065f46",
+                    marginBottom: "16px",
+                  }}
+                >
+                  ✓ Test sent to {broadcast.test_sent_to}. Editing the draft
+                  clears this approval.
+                </p>
+              ) : (
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "#92400e",
+                    marginBottom: "16px",
+                  }}
+                >
+                  No test sent yet for this version of the draft.
+                </p>
+              )}
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void goToStep(2);
+                  }}
+                  style={style.secondaryButton(false)}
+                >
+                  ← Back to preview
+                </button>
+                <button
+                  type="button"
+                  disabled={broadcast.test_sent_at === null}
+                  onClick={() => {
+                    void goToStep(4);
+                  }}
+                  style={style.button(broadcast.test_sent_at === null)}
+                >
+                  Continue to send
+                </button>
+              </div>
+            </div>
+          )}
+
+          {wizardStep === 4 && broadcast !== null && (
+            <div style={style.cardBody}>
+              <div style={style.summaryRow}>
+                <span style={style.summaryKey}>Subject</span>
+                {broadcast.subject}
+              </div>
+              <div style={style.summaryRow}>
+                <span style={style.summaryKey}>From</span>
+                {senderIdentity !== undefined
+                  ? `${senderIdentity.name} <${senderIdentity.email}>`
+                  : "—"}
+                {senderIdentity?.reply_to != null &&
+                  ` · replies to ${senderIdentity.reply_to}`}
+              </div>
+              <div style={{ ...style.summaryRow, marginBottom: "16px" }}>
+                <span style={style.summaryKey}>Audience</span>
+                {String(verifiedCount)} verified subscribers (unsubscribed,
+                bounced, and complained are excluded)
+              </div>
+              {emailEnabled ? (
+                <div style={{ ...style.banner, marginBottom: "16px" }}>
+                  Sending is immediate: emails go out to all{" "}
+                  {String(verifiedCount)} verified subscribers the moment you
+                  click Send. There is no scheduling and no undo.
+                </div>
+              ) : (
+                <div style={{ ...style.banner, marginBottom: "16px" }}>
+                  Dry-run mode: EMAIL_ENABLED is false, so clicking Send only
+                  reports what would happen — nothing is delivered and the draft
+                  is unchanged. Set EMAIL_ENABLED=true in .env.local when you
+                  intend to send for real.
+                </div>
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-end",
+                  flexWrap: "wrap",
+                  marginBottom: "16px",
+                }}
+              >
+                <div>
+                  <label htmlFor="confirm-count" style={style.label}>
+                    Type the recipient count ({String(verifiedCount)}) to
+                    confirm
+                  </label>
+                  <input
+                    id="confirm-count"
+                    type="text"
+                    value={confirmCount}
+                    onChange={(e) => {
+                      setConfirmCount(e.target.value);
+                    }}
+                    disabled={sendLoading || !isSendable}
+                    placeholder={String(verifiedCount)}
+                    style={{ ...style.input, width: "240px" }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={sendLoading || !isSendable || !sendConfirmed}
+                  onClick={() => {
+                    void handleSend();
+                  }}
+                  style={style.button(
+                    sendLoading || !isSendable || !sendConfirmed
+                  )}
+                >
+                  {sendLoading
+                    ? "Sending…"
+                    : emailEnabled
+                      ? `Send now to ${String(verifiedCount)} subscribers`
+                      : "Run dry-run report"}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void goToStep(3);
+                }}
+                style={style.secondaryButton(false)}
+              >
+                ← Back to test send
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isEditing && wizardStep === 1 && (
+        <div style={style.card}>
+          <div
+            style={{ ...style.cardHeader, cursor: "pointer" }}
+            onClick={() => {
+              setShowFormattingGuide(!showFormattingGuide);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setShowFormattingGuide(!showFormattingGuide);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            <span>Formatting guide</span>
+            <span
+              style={{
+                fontSize: "12px",
+                color: "#9ca3af",
+                transform: showFormattingGuide
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
+                transition: "transform 0.2s",
+                userSelect: "none",
+              }}
+            >
+              ▼
+            </span>
           </div>
+          {showFormattingGuide && (
+            <div style={style.cardBody}>
+              <p style={{ ...style.hint, marginTop: 0, marginBottom: "16px" }}>
+                These elements inherit the email template&apos;s styling
+                automatically — paste a snippet into the content and edit the
+                text. Inline styles in your HTML override the defaults.
+              </p>
+
+              <div style={style.guideRow}>
+                <div style={style.label}>Heading 1 — main title</div>
+                <code style={style.codeBlock}>
+                  {"<h1>Big announcement</h1>"}
+                </code>
+                <div style={style.exampleBox}>
+                  <span style={style.guideHeading("28px")}>
+                    Big announcement
+                  </span>
+                </div>
+              </div>
+
+              <div style={style.guideRow}>
+                <div style={style.label}>Heading 2 — section</div>
+                <code style={style.codeBlock}>
+                  {"<h2>What's happening</h2>"}
+                </code>
+                <div style={style.exampleBox}>
+                  <span style={style.guideHeading("22px")}>
+                    What&apos;s happening
+                  </span>
+                </div>
+              </div>
+
+              <div style={style.guideRow}>
+                <div style={style.label}>Heading 3 — subsection</div>
+                <code style={style.codeBlock}>{"<h3>The details</h3>"}</code>
+                <div style={style.exampleBox}>
+                  <span style={style.guideHeading("18px")}>The details</span>
+                </div>
+              </div>
+
+              <div style={style.guideRow}>
+                <div style={style.label}>Paragraph with a link</div>
+                <code style={style.codeBlock}>
+                  {
+                    '<p>Details are on <a href="https://lu.ma/fractalboston">our calendar</a>.</p>'
+                  }
+                </code>
+                <div style={style.exampleBox}>
+                  Details are on{" "}
+                  <span style={style.guideLink}>our calendar</span>.
+                </div>
+              </div>
+
+              <div style={style.guideRow}>
+                <div style={style.label}>Button</div>
+                <code style={style.codeBlock}>
+                  {
+                    '<p><a class="button" href="https://lu.ma/fractalboston">📅 RSVP on Luma</a></p>'
+                  }
+                </code>
+                <div style={style.exampleBox}>
+                  <span style={style.guideButton}>📅 RSVP on Luma</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -949,50 +1480,11 @@ export default function BroadcastsPage(): ReactElement {
         </div>
       )}
 
-      {broadcast !== null && (
+      {broadcast !== null && !isDraft && (
         <div style={style.card}>
           <div style={style.cardHeader}>Actions</div>
           <div style={style.cardBody}>
-            {isDraft && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  alignItems: "flex-end",
-                  flexWrap: "wrap" as const,
-                  marginBottom: "16px",
-                }}
-              >
-                <div>
-                  <label htmlFor="test-email" style={style.label}>
-                    Test send to
-                  </label>
-                  <input
-                    id="test-email"
-                    type="email"
-                    value={testEmail}
-                    onChange={(e) => {
-                      setTestEmail(e.target.value);
-                    }}
-                    disabled={testLoading}
-                    placeholder="your@email.com"
-                    style={{ ...style.input, width: "240px" }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  disabled={testLoading || testEmail.trim() === ""}
-                  onClick={() => {
-                    void handleTestSend();
-                  }}
-                  style={style.button(testLoading || testEmail.trim() === "")}
-                >
-                  {testLoading ? "Sending…" : "Send test"}
-                </button>
-              </div>
-            )}
-
-            {(isDraft || broadcast.status === "failed") && (
+            {broadcast.status === "failed" && (
               <div
                 style={{
                   display: "flex",
@@ -1029,21 +1521,9 @@ export default function BroadcastsPage(): ReactElement {
                     sendLoading || !isSendable || !sendConfirmed
                   )}
                 >
-                  {sendLoading
-                    ? "Sending…"
-                    : broadcast.status === "failed"
-                      ? "Retry failed and resume"
-                      : emailEnabled
-                        ? `Send to ${String(verifiedCount)} subscribers`
-                        : "Dry run send"}
+                  {sendLoading ? "Sending…" : "Retry failed and resume"}
                 </button>
               </div>
-            )}
-            {isDraft && broadcast.test_sent_at === null && (
-              <p style={style.hint}>
-                Send a test email first. Editing the draft after a test clears
-                the approval.
-              </p>
             )}
 
             <button
@@ -1060,22 +1540,10 @@ export default function BroadcastsPage(): ReactElement {
         </div>
       )}
 
-      {detail !== null && (
+      {detail !== null && !isDraft && (
         <div style={style.card}>
           <div style={style.cardHeader}>Email preview</div>
-          <div
-            style={{
-              fontFamily:
-                "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-              maxWidth: "600px",
-              margin: "0 auto",
-              padding: "20px",
-              color: "#1a1a1a",
-              fontSize: "16px",
-              lineHeight: 1.5,
-            }}
-            dangerouslySetInnerHTML={{ __html: detail.previewHtml }}
-          />
+          <div dangerouslySetInnerHTML={{ __html: detail.previewHtml }} />
         </div>
       )}
 
@@ -1203,8 +1671,8 @@ export default function BroadcastsPage(): ReactElement {
             ⚠️ Add sender identities sparingly. Mailbox providers build
             reputation per sending address — a small set of consistent,
             recognizable senders delivers better than a new address for every
-            broadcast. Addresses must be @{SENDER_EMAIL_DOMAIN} (covered by the
-            domain&apos;s SES verification).
+            broadcast.{" "}
+            {`Addresses must be @${SENDER_EMAIL_DOMAIN} (covered by the domain's SES verification).`}
           </p>
         </div>
       </div>
