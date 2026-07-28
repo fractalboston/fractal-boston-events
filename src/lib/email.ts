@@ -65,27 +65,27 @@ function isQuotaError(error: unknown): boolean {
   );
 }
 
-async function sendEmailIfEnabled({
+async function sendViaSes({
   to,
   subject,
   html,
+  from,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
+  from: string;
+  replyTo?: string;
 }): Promise<void> {
-  if (!env.EMAIL_ENABLED) {
-    console.warn(`Trying to email ${to} but EMAIL_ENABLED is false`);
-    return;
-  }
-
   const ses = getSES();
   try {
     const params: SendEmailCommandInput = {
-      Source: EMAIL_FROM,
+      Source: from,
       Destination: {
         ToAddresses: [to],
       },
+      ReplyToAddresses: replyTo !== undefined ? [replyTo] : undefined,
       Message: {
         Subject: {
           Data: subject,
@@ -119,6 +119,60 @@ async function sendEmailIfEnabled({
     }
     throw error;
   }
+}
+
+async function sendEmailIfEnabled({
+  to,
+  subject,
+  html,
+  from,
+  replyTo,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+  replyTo?: string;
+}): Promise<void> {
+  if (!env.EMAIL_ENABLED) {
+    console.warn(`Trying to email ${to} but EMAIL_ENABLED is false`);
+    return;
+  }
+
+  await sendViaSes({ to, subject, html, from: from ?? EMAIL_FROM, replyTo });
+}
+
+export async function sendBroadcastEmail({
+  to,
+  subject,
+  html,
+  from,
+  replyTo,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  from: string;
+  replyTo?: string;
+}): Promise<void> {
+  await sendEmailIfEnabled({ to, subject, html, from, replyTo });
+}
+
+/** Test sends bypass EMAIL_ENABLED, mirroring sendTestEmail. */
+export async function sendBroadcastTestEmail({
+  to,
+  subject,
+  html,
+  from,
+  replyTo,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  from: string;
+  replyTo?: string;
+}): Promise<void> {
+  await sendViaSes({ to, subject, html, from, replyTo });
 }
 
 export async function sendVerificationEmail(
@@ -426,46 +480,7 @@ export async function sendTestEmail(
   );
   const { from, subject, html } = getBasicEmailContent(events, true);
 
-  const ses = getSES();
-  try {
-    const params: SendEmailCommandInput = {
-      Source: from,
-      Destination: {
-        ToAddresses: [email],
-      },
-      Message: {
-        Subject: {
-          Data: subject,
-          Charset: "UTF-8",
-        },
-        Body: {
-          Html: {
-            Data: html,
-            Charset: "UTF-8",
-          },
-        },
-      },
-    };
-
-    const command = new SendEmailCommand(params);
-    const result = await ses.send(command);
-
-    if (result.MessageId === undefined || result.MessageId === "") {
-      throw new Error(
-        "SES API returned invalid response - email may not have been sent"
-      );
-    }
-  } catch (error) {
-    if (error instanceof SESQuotaError) {
-      throw error;
-    }
-    if (isQuotaError(error)) {
-      throw new SESQuotaError(
-        `SES quota exceeded: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-    throw error;
-  }
+  await sendViaSes({ to: email, subject, html, from });
 
   await sendDiscordInfo({
     webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
