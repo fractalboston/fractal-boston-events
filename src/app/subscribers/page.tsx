@@ -61,7 +61,7 @@ export default function SubscribersPage(): ReactElement {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sort, setSort] = useState<SortOption>("newest");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("verified");
   const [results, setResults] = useState<Subscriber[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
@@ -85,6 +85,7 @@ export default function SubscribersPage(): ReactElement {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showAddSubscriberForm, setShowAddSubscriberForm] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const activeSearchControllerRef = useRef<AbortController | null>(null);
 
@@ -262,6 +263,91 @@ export default function SubscribersPage(): ReactElement {
     setEditSource(s.source);
     setEditStatus(s.status);
     setMessage(null);
+  }
+
+  function escapeCsvField(value: string): string {
+    if (/[",\n\r]/.test(value)) {
+      return `"${value.replaceAll('"', '""')}"`;
+    }
+    return value;
+  }
+
+  function downloadCsv({
+    rows,
+  }: {
+    rows: Array<Pick<Subscriber, "id" | "email" | "status">>;
+  }): void {
+    const header = "id,email,status";
+    const body = rows
+      .map(
+        (row) =>
+          `${escapeCsvField(row.id)},${escapeCsvField(row.email)},${escapeCsvField(row.status)}`
+      )
+      .join("\n");
+    const csv = `${header}\n${body}\n`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const statusPart = statusFilter === "all" ? "all" : statusFilter;
+    const datePart = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `subscribers-${statusPart}-${datePart}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleExportCsv(): Promise<void> {
+    if (exportLoading || totalCount === 0) {
+      return;
+    }
+    setExportLoading(true);
+    setMessage(null);
+    try {
+      const exportPageSize = 100;
+      const allRows: Array<Pick<Subscriber, "id" | "email" | "status">> = [];
+      let offset = 0;
+      let hasMorePages = true;
+
+      while (hasMorePages) {
+        const params = new URLSearchParams();
+        params.set("q", debouncedQuery);
+        params.set("sort", sort);
+        params.set("limit", exportPageSize.toString());
+        params.set("offset", offset.toString());
+        if (statusFilter !== "all") {
+          params.set("status", statusFilter);
+        }
+        const response = await fetch(`/api/subscribers?${params.toString()}`);
+        const data: SearchResponse = await response.json();
+        if (!data.success || data.data?.subscribers === undefined) {
+          setMessage({
+            type: "error",
+            text: data.error ?? "Export failed",
+          });
+          return;
+        }
+        for (const subscriber of data.data.subscribers) {
+          allRows.push({
+            id: subscriber.id,
+            email: subscriber.email,
+            status: subscriber.status,
+          });
+        }
+        hasMorePages = data.data.hasMore;
+        offset = data.data.nextOffset;
+      }
+
+      downloadCsv({ rows: allRows });
+      setMessage({
+        type: "success",
+        text: `Exported ${String(allRows.length)} subscriber${allRows.length !== 1 ? "s" : ""} to CSV.`,
+      });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setExportLoading(false);
+    }
   }
 
   async function handleCreate(
@@ -463,6 +549,16 @@ export default function SubscribersPage(): ReactElement {
       borderRadius: "6px",
       cursor: disabled ? "not-allowed" : "pointer",
       fontWeight: "500",
+    }),
+    secondaryButton: (disabled: boolean): CSSProperties => ({
+      backgroundColor: "transparent",
+      color: disabled ? "#9ca3af" : "#6b7280",
+      padding: "6px 12px",
+      fontSize: "13px",
+      border: "1px solid #d1d5db",
+      borderRadius: "6px",
+      cursor: disabled ? "not-allowed" : "pointer",
+      fontWeight: "400",
     }),
     message: (type: "success" | "error"): CSSProperties => ({
       marginBottom: "20px",
@@ -929,8 +1025,28 @@ export default function SubscribersPage(): ReactElement {
               }}
               className="subscribers-right-column"
             >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginBottom: "8px",
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={exportLoading || totalCount === 0}
+                  onClick={() => {
+                    void handleExportCsv();
+                  }}
+                  style={style.secondaryButton(
+                    exportLoading || totalCount === 0
+                  )}
+                >
+                  {exportLoading ? "Exporting…" : "Export CSV"}
+                </button>
+              </div>
               <div style={style.card}>
-                <div style={style.cardHeader}>
+                <div style={{ ...style.cardHeader, cursor: "default" }}>
                   {totalCount} subscriber{totalCount !== 1 ? "s" : ""}
                 </div>
                 {results.map((s) => (
