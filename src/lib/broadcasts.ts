@@ -5,6 +5,7 @@ import type {
   BroadcastRecipient,
   BroadcastStatus,
   SenderIdentity,
+  SubscriberStatus,
 } from "@/db/db";
 import { SENDER_EMAIL_DOMAIN } from "@/lib/constants";
 import { wrapInBroadcastTemplate } from "@/lib/emailTemplates";
@@ -65,10 +66,12 @@ export function editClearsTestApproval({
   );
 }
 
+const SENDABLE_STATUSES: BroadcastStatus[] = ["draft", "failed", "partial"];
+
 export function canSendBroadcast(
   broadcast: Pick<Broadcast, "status" | "test_sent_at">
 ): { ok: true } | { ok: false; reason: string } {
-  if (broadcast.status !== "draft" && broadcast.status !== "failed") {
+  if (!SENDABLE_STATUSES.includes(broadcast.status)) {
     return {
       ok: false,
       reason: `Broadcast is ${broadcast.status} and cannot be sent`,
@@ -83,22 +86,33 @@ export function canSendBroadcast(
   return { ok: true };
 }
 
+/**
+ * "sent" means fully delivered (nothing failed), "partial" means delivered
+ * with failures left to retry, and "failed" means aborted (pending remain)
+ * or nothing delivered. failed and partial broadcasts stay claimable so
+ * their failed recipients can be retried.
+ */
 export function resolveBroadcastFinalStatus({
   pendingCount,
   sentCount,
+  failedCount,
   totalCount,
 }: {
   pendingCount: number;
   sentCount: number;
+  failedCount: number;
   totalCount: number;
 }): BroadcastStatus {
   if (totalCount === 0) {
     return "sent";
   }
-  if (pendingCount === 0 && sentCount > 0) {
+  if (pendingCount > 0) {
+    return "failed";
+  }
+  if (failedCount === 0) {
     return "sent";
   }
-  return "failed";
+  return sentCount > 0 ? "partial" : "failed";
 }
 
 export async function listSenderIdentities(): Promise<SenderIdentity[]> {
@@ -299,7 +313,9 @@ export async function markBroadcastTestSent({
 /**
  * Atomically claim a broadcast for sending so a double-click or concurrent
  * request can never start the same send twice. A broadcast stuck in "sending"
- * (crashed run) can be reclaimed after 10 minutes.
+ * (crashed run) can be reclaimed after 10 minutes of inactivity; the send
+ * loop heartbeats via touchBroadcast so a healthy long-running send is never
+ * treated as stuck.
  */
 export async function claimBroadcastForSending(
   id: string
@@ -311,7 +327,7 @@ export async function claimBroadcastForSending(
     .where("test_sent_at", "is not", null)
     .where((eb) =>
       eb.or([
-        eb("status", "in", ["draft", "failed"]),
+        eb("status", "in", ["draft", "failed", "partial"]),
         eb.and([
           eb("status", "=", "sending"),
           eb("updated_at", "<", sql<Date>`now() - interval '10 minutes'`),
@@ -320,6 +336,16 @@ export async function claimBroadcastForSending(
     )
     .returningAll()
     .executeTakeFirst();
+}
+
+/** Bumps updated_at (via the table trigger) so the reclaim window stays closed mid-send. */
+export async function touchBroadcast(id: string): Promise<void> {
+  await db
+    .updateTable("broadcasts")
+    .set({ status: "sending" })
+    .where("id", "=", id)
+    .where("status", "=", "sending")
+    .execute();
 }
 
 /** Records the sender details actually used, kept even if the identity is later edited. */
@@ -341,9 +367,10 @@ export async function stampBroadcastSender({
 }
 
 /**
- * Snapshot the current verified audience as pending recipient rows. Re-running
- * on a resumed send keeps existing rows untouched, so recipients already
- * marked sent can never be emailed again.
+ * Snapshot the current verified audience as pending recipient rows. Called
+ * only on the first claim of a broadcast - the audience is frozen at first
+ * send. The ON CONFLICT guard additionally keeps existing rows untouched, so
+ * recipients already marked sent can never be emailed again.
  */
 export async function snapshotBroadcastRecipients(
   broadcastId: string
@@ -371,7 +398,7 @@ export type PendingRecipient = {
   id: string;
   email: string;
   subscriberToken: string | null;
-  subscriberStatus: string | null;
+  subscriberStatus: SubscriberStatus | null;
 };
 
 export async function getPendingRecipients(
@@ -503,6 +530,7 @@ export async function finalizeBroadcast(
   const status = resolveBroadcastFinalStatus({
     pendingCount: counts.pendingCount,
     sentCount: counts.sentCount,
+    failedCount: counts.failedCount,
     totalCount: counts.totalCount,
   });
 
@@ -513,7 +541,7 @@ export async function finalizeBroadcast(
       recipient_count: counts.totalCount,
       success_count: counts.sentCount,
       failed_count: counts.failedCount,
-      sent_at: status === "sent" ? sql`now()` : null,
+      sent_at: counts.sentCount > 0 ? sql`now()` : null,
     })
     .where("id", "=", id)
     .where("status", "=", "sending")

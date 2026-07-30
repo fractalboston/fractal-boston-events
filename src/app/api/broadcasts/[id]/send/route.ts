@@ -23,6 +23,7 @@ import {
   resetFailedRecipients,
   snapshotBroadcastRecipients,
   stampBroadcastSender,
+  touchBroadcast,
   updateLastBroadcastAt,
 } from "@/lib/broadcasts";
 import { sendDiscordInfo } from "@/lib/discord";
@@ -34,6 +35,7 @@ const idSchema = z.guid("Invalid broadcast id");
 
 const bodySchema = z.object({
   retryFailed: z.boolean().optional(),
+  confirmRecipientCount: z.number().int().nonnegative(),
 });
 
 export async function POST(
@@ -72,17 +74,21 @@ export async function POST(
       return sendBadRequest(check.reason);
     }
 
+    // The typed-count confirmation is enforced here, not just in the UI, so a
+    // scripted call cannot bypass it
+    const recipientCount = await countVerifiedSubscribers();
+    if (parsed.data.confirmRecipientCount !== recipientCount) {
+      return sendBadRequest(
+        `Recipient count confirmation mismatch: there are currently ${String(recipientCount)} verified subscribers`
+      );
+    }
+
     if (!env.EMAIL_ENABLED) {
-      const recipientCount = await countVerifiedSubscribers();
       return sendSuccess({
         dryRun: true,
         recipientCount,
         message: `Dry run - EMAIL_ENABLED is false. Would send to ${String(recipientCount)} verified subscribers. Nothing was sent and no state was changed.`,
       });
-    }
-
-    if (retryFailed && broadcast.status === "failed") {
-      await resetFailedRecipients(broadcast.id);
     }
 
     const claimed = await claimBroadcastForSending(broadcast.id);
@@ -100,13 +106,34 @@ export async function POST(
     const replyTo = claimed.sent_reply_to ?? identity.reply_to;
     await stampBroadcastSender({ id: claimed.id, from, replyTo });
 
-    await snapshotBroadcastRecipients(claimed.id);
+    // The audience is frozen at the first claim: resumes and retries complete
+    // the original audience rather than adding subscribers who verified after
+    // the send started
+    if (broadcast.status === "draft") {
+      await snapshotBroadcastRecipients(claimed.id);
+    }
+    // Reset only after a successful claim so a request that loses the race
+    // cannot flip rows out from under the winner
+    if (
+      retryFailed &&
+      (broadcast.status === "failed" || broadcast.status === "partial")
+    ) {
+      await resetFailedRecipients(claimed.id);
+    }
+
     const pending = await getPendingRecipients(claimed.id);
 
     const successEmails: string[] = [];
     let quotaAborted = false;
+    let processed = 0;
 
     for (const recipient of pending) {
+      processed++;
+      // Heartbeat so a healthy long send is never mistaken for a crashed one
+      // and reclaimed by a concurrent request
+      if (processed % 25 === 0) {
+        await touchBroadcast(claimed.id);
+      }
       // Re-check eligibility at send time - a subscriber may have unsubscribed
       // or bounced between snapshot and a resumed send
       if (
@@ -136,6 +163,8 @@ export async function POST(
           from,
           replyTo: replyTo ?? undefined,
         });
+        // At-least-once delivery: a crash between SES accepting and this mark
+        // re-sends to this one recipient on resume
         await markRecipientSent(recipient.id);
         successEmails.push(recipient.email);
         // Small delay to stay within SES rate limits

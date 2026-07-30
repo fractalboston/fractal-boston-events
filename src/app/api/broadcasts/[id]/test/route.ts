@@ -14,7 +14,7 @@ import {
   markBroadcastTestSent,
 } from "@/lib/broadcasts";
 import { sendDiscordInfo } from "@/lib/discord";
-import { sendBroadcastTestEmail } from "@/lib/email";
+import { sendBroadcastEmail } from "@/lib/email";
 import { env, isDevelopment } from "@/lib/env";
 import { joinAppUrl } from "@/lib/urls";
 
@@ -66,7 +66,7 @@ export async function POST(
     });
     const subject = formatTestSubject(broadcast.subject);
 
-    await sendBroadcastTestEmail({
+    await sendBroadcastEmail({
       to: parsed.data.email,
       subject,
       html,

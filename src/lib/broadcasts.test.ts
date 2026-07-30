@@ -192,6 +192,12 @@ describe("canSendBroadcast", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("allows retrying a partial broadcast", () => {
+    expect(
+      canSendBroadcast({ status: "partial", test_sent_at: testSentAt })
+    ).toEqual({ ok: true });
+  });
+
   it("rejects a broadcast that is already sending", () => {
     const result = canSendBroadcast({
       status: "sending",
@@ -207,19 +213,21 @@ describe("resolveBroadcastFinalStatus", () => {
       resolveBroadcastFinalStatus({
         pendingCount: 0,
         sentCount: 10,
+        failedCount: 0,
         totalCount: 10,
       })
     ).toBe("sent");
   });
 
-  it("returns sent with partial failures once nothing is pending", () => {
+  it("returns partial when delivered with failures remaining", () => {
     expect(
       resolveBroadcastFinalStatus({
         pendingCount: 0,
         sentCount: 8,
+        failedCount: 2,
         totalCount: 10,
       })
-    ).toBe("sent");
+    ).toBe("partial");
   });
 
   it("returns failed when sends remain pending (quota abort)", () => {
@@ -227,6 +235,7 @@ describe("resolveBroadcastFinalStatus", () => {
       resolveBroadcastFinalStatus({
         pendingCount: 5,
         sentCount: 3,
+        failedCount: 2,
         totalCount: 10,
       })
     ).toBe("failed");
@@ -237,9 +246,21 @@ describe("resolveBroadcastFinalStatus", () => {
       resolveBroadcastFinalStatus({
         pendingCount: 0,
         sentCount: 0,
+        failedCount: 10,
         totalCount: 10,
       })
     ).toBe("failed");
+  });
+
+  it("returns sent when every recipient was skipped", () => {
+    expect(
+      resolveBroadcastFinalStatus({
+        pendingCount: 0,
+        sentCount: 0,
+        failedCount: 0,
+        totalCount: 10,
+      })
+    ).toBe("sent");
   });
 
   it("returns sent for an empty audience", () => {
@@ -247,6 +268,7 @@ describe("resolveBroadcastFinalStatus", () => {
       resolveBroadcastFinalStatus({
         pendingCount: 0,
         sentCount: 0,
+        failedCount: 0,
         totalCount: 0,
       })
     ).toBe("sent");

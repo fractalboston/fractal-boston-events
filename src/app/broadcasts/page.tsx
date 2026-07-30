@@ -18,7 +18,7 @@ type SenderIdentity = {
   reply_to: string | null;
 };
 
-type BroadcastStatus = "draft" | "sending" | "sent" | "failed";
+type BroadcastStatus = "draft" | "sending" | "sent" | "partial" | "failed";
 
 type Broadcast = {
   id: string;
@@ -117,6 +117,7 @@ const STATUS_COLORS: Record<BroadcastStatus, { bg: string; fg: string }> = {
   draft: { bg: "#f3f4f6", fg: "#374151" },
   sending: { bg: "#fef3c7", fg: "#92400e" },
   sent: { bg: "#d1fae5", fg: "#065f46" },
+  partial: { bg: "#ffedd5", fg: "#9a3412" },
   failed: { bg: "#fee2e2", fg: "#991b1b" },
 };
 
@@ -320,9 +321,11 @@ export default function BroadcastsPage(): ReactElement {
     }
     let current = detail?.broadcast ?? null;
     const dirty =
-      subject !== current?.subject ||
-      content !== current.content ||
-      senderIdentityId !== current.sender_identity_id;
+      current === null
+        ? true
+        : subject !== current.subject ||
+          content !== current.content ||
+          senderIdentityId !== current.sender_identity_id;
     if (wizardStep === 1 && dirty) {
       current = await saveDraft();
       if (current === null) return;
@@ -396,7 +399,10 @@ export default function BroadcastsPage(): ReactElement {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          retryFailed: detail.broadcast.status === "failed",
+          retryFailed:
+            detail.broadcast.status === "failed" ||
+            detail.broadcast.status === "partial",
+          confirmRecipientCount: Number(confirmCount.trim()),
         }),
       });
       const data = (await response.json()) as SendResponse;
@@ -524,13 +530,17 @@ export default function BroadcastsPage(): ReactElement {
   const isDraft = broadcast !== null && broadcast.status === "draft";
   const isSendable =
     broadcast !== null &&
-    (broadcast.status === "draft" || broadcast.status === "failed") &&
+    (broadcast.status === "draft" ||
+      broadcast.status === "failed" ||
+      broadcast.status === "partial") &&
     broadcast.test_sent_at !== null;
   const sendConfirmed = confirmCount.trim() === String(verifiedCount);
   const isDirty =
-    subject !== broadcast?.subject ||
-    content !== broadcast.content ||
-    senderIdentityId !== broadcast.sender_identity_id;
+    broadcast === null
+      ? true
+      : subject !== broadcast.subject ||
+        content !== broadcast.content ||
+        senderIdentityId !== broadcast.sender_identity_id;
   const maxUnlockedStep: WizardStep =
     broadcast === null || !isDraft
       ? 1
@@ -794,6 +804,13 @@ export default function BroadcastsPage(): ReactElement {
     },
     summaryRow: { marginBottom: "8px", fontSize: "13px", color: "#374151" },
     summaryKey: { color: "#6b7280", marginRight: "8px" },
+    previewFrame: {
+      display: "block",
+      width: "100%",
+      height: "640px",
+      border: "none",
+      backgroundColor: "#ffffff",
+    },
   };
 
   return (
@@ -859,18 +876,19 @@ export default function BroadcastsPage(): ReactElement {
               </span>
             </span>
             <span style={{ flexShrink: 0 }}>
-              {b.status === "sent" && b.success_count !== null && (
-                <span
-                  style={{
-                    color: "#9ca3af",
-                    marginRight: "8px",
-                    fontSize: "12px",
-                  }}
-                >
-                  {String(b.success_count)}/{String(b.recipient_count ?? 0)}{" "}
-                  sent
-                </span>
-              )}
+              {(b.status === "sent" || b.status === "partial") &&
+                b.success_count !== null && (
+                  <span
+                    style={{
+                      color: "#9ca3af",
+                      marginRight: "8px",
+                      fontSize: "12px",
+                    }}
+                  >
+                    {String(b.success_count)}/{String(b.recipient_count ?? 0)}{" "}
+                    sent
+                  </span>
+                )}
               <span style={style.statusChip(b.status)}>{b.status}</span>
             </span>
           </div>
@@ -1063,7 +1081,12 @@ export default function BroadcastsPage(): ReactElement {
                 This is exactly what recipients will receive — including the
                 header, footer, and unsubscribe link the template adds.
               </div>
-              <div dangerouslySetInnerHTML={{ __html: detail.previewHtml }} />
+              <iframe
+                srcDoc={detail.previewHtml}
+                sandbox=""
+                title="Email preview"
+                style={style.previewFrame}
+              />
               <div
                 style={{
                   ...style.cardBody,
@@ -1484,7 +1507,8 @@ export default function BroadcastsPage(): ReactElement {
         <div style={style.card}>
           <div style={style.cardHeader}>Actions</div>
           <div style={style.cardBody}>
-            {broadcast.status === "failed" && (
+            {(broadcast.status === "failed" ||
+              broadcast.status === "partial") && (
               <div
                 style={{
                   display: "flex",
@@ -1543,7 +1567,12 @@ export default function BroadcastsPage(): ReactElement {
       {detail !== null && !isDraft && (
         <div style={style.card}>
           <div style={style.cardHeader}>Email preview</div>
-          <div dangerouslySetInnerHTML={{ __html: detail.previewHtml }} />
+          <iframe
+            srcDoc={detail.previewHtml}
+            sandbox=""
+            title="Email preview"
+            style={style.previewFrame}
+          />
         </div>
       )}
 

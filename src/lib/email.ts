@@ -125,41 +125,27 @@ async function sendEmailIfEnabled({
   to,
   subject,
   html,
-  from,
-  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
-  from?: string;
-  replyTo?: string;
 }): Promise<void> {
   if (!env.EMAIL_ENABLED) {
     console.warn(`Trying to email ${to} but EMAIL_ENABLED is false`);
     return;
   }
 
-  await sendViaSes({ to, subject, html, from: from ?? EMAIL_FROM, replyTo });
+  await sendViaSes({ to, subject, html, from: EMAIL_FROM });
 }
 
+/**
+ * Deliberately NOT gated on EMAIL_ENABLED: the broadcast send route enforces
+ * the dry-run gate explicitly before calling this, and test sends always
+ * deliver (mirroring sendTestEmail). Routing through the gated helper would
+ * silently no-op and let the send loop mark recipients sent with nothing
+ * delivered.
+ */
 export async function sendBroadcastEmail({
-  to,
-  subject,
-  html,
-  from,
-  replyTo,
-}: {
-  to: string;
-  subject: string;
-  html: string;
-  from: string;
-  replyTo?: string;
-}): Promise<void> {
-  await sendEmailIfEnabled({ to, subject, html, from, replyTo });
-}
-
-/** Test sends bypass EMAIL_ENABLED, mirroring sendTestEmail. */
-export async function sendBroadcastTestEmail({
   to,
   subject,
   html,

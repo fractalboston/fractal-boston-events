@@ -37,7 +37,12 @@ export type SenderIdentitiesTable = {
 };
 export type SenderIdentity = Degenerate<SenderIdentitiesTable>;
 
-export type BroadcastStatus = "draft" | "sending" | "sent" | "failed";
+export type BroadcastStatus =
+  | "draft"
+  | "sending"
+  | "sent"
+  | "partial"
+  | "failed";
 
 export type BroadcastsTable = {
   id: Generated<string>;
@@ -97,7 +102,11 @@ function connectionStringWithoutSslMode(url: string): string {
 // Transaction mode does not support prepared statements, which Kysely handles automatically
 const pool = new Pool({
   connectionString: connectionStringWithoutSslMode(env.POSTGRES_URL),
-  ssl: { rejectUnauthorized: false },
+  // TEMP (local preview only, do not commit): local Postgres has no SSL
+  ssl:
+    new URL(env.POSTGRES_URL).hostname === "localhost"
+      ? undefined
+      : { rejectUnauthorized: false },
   // Serverless-optimized pool settings for Supabase Transaction Mode
   max: 15, // Maximum number of clients in the pool
   min: 0, // Minimum number of clients (0 for serverless)
