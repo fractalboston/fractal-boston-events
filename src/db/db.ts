@@ -102,7 +102,6 @@ function connectionStringWithoutSslMode(url: string): string {
 // Transaction mode does not support prepared statements, which Kysely handles automatically
 const pool = new Pool({
   connectionString: connectionStringWithoutSslMode(env.POSTGRES_URL),
-  // TEMP (local preview only, do not commit): local Postgres has no SSL
   ssl:
     new URL(env.POSTGRES_URL).hostname === "localhost"
       ? undefined

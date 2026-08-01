@@ -278,7 +278,7 @@ export default function SubscribersPage(): ReactElement {
   function downloadCsv({
     rows,
   }: {
-    rows: Array<Pick<Subscriber, "id" | "email" | "status">>;
+    rows: Pick<Subscriber, "id" | "email" | "status">[];
   }): void {
     const header = "id,email,status";
     const body = rows
@@ -307,7 +307,7 @@ export default function SubscribersPage(): ReactElement {
     setMessage(null);
     try {
       const exportPageSize = 100;
-      const allRows: Array<Pick<Subscriber, "id" | "email" | "status">> = [];
+      const allRows: Pick<Subscriber, "id" | "email" | "status">[] = [];
       let offset = 0;
       let hasMorePages = true;
 
@@ -321,7 +321,7 @@ export default function SubscribersPage(): ReactElement {
           params.set("status", statusFilter);
         }
         const response = await fetch(`/api/subscribers?${params.toString()}`);
-        const data: SearchResponse = await response.json();
+        const data = (await response.json()) as SearchResponse;
         if (!data.success || data.data?.subscribers === undefined) {
           setMessage({
             type: "error",
