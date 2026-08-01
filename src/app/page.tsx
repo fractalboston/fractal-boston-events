@@ -20,6 +20,10 @@ export default function Home(): ReactElement {
             <Link href="/subscribers">Subscribers</Link> — search and edit
             subscriber records (dev only).
           </p>
+          <p>
+            <Link href="/broadcasts">Broadcasts</Link> — compose and send
+            one-off emails to the list (dev only).
+          </p>
         </>
       )}
     </div>

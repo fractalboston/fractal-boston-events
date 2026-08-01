@@ -13,6 +13,22 @@ function escapeForLike(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
+/**
+ * Statuses that may re-enter the double opt-in flow when the person explicitly
+ * asks to subscribe again. Bounces can be transient (full mailbox) and a fresh
+ * verification click is an explicit consent signal, so both suppression
+ * statuses are eligible alongside unsubscribed.
+ */
+export const RESUBSCRIBE_ELIGIBLE_STATUSES: SubscriberStatus[] = [
+  "unsubscribed",
+  "bounced",
+  "complained",
+];
+
+export function isResubscribeEligible(status: SubscriberStatus): boolean {
+  return RESUBSCRIBE_ELIGIBLE_STATUSES.includes(status);
+}
+
 export type CreateSubscriberInput = {
   email: string;
   source: "form" | "luma" | "substack" | "manual";

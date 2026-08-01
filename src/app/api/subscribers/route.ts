@@ -19,7 +19,9 @@ import {
 const createBodySchema = z.object({
   email: z.email(),
   source: z.enum(["form", "luma", "substack", "manual"]).optional(),
-  status: z.enum(["pending", "verified", "unsubscribed"]).optional(),
+  status: z
+    .enum(["pending", "verified", "unsubscribed", "bounced", "complained"])
+    .optional(),
 });
 
 type CreateBody = z.infer<typeof createBodySchema>;
@@ -28,7 +30,9 @@ const updateBodySchema = z.object({
   id: subscriberIdParamSchema,
   email: z.email().optional(),
   source: z.enum(["form", "luma", "substack", "manual"]).optional(),
-  status: z.enum(["pending", "verified", "unsubscribed"]).optional(),
+  status: z
+    .enum(["pending", "verified", "unsubscribed", "bounced", "complained"])
+    .optional(),
 });
 
 type UpdateBody = z.infer<typeof updateBodySchema>;
@@ -37,7 +41,9 @@ const listQuerySchema = z.object({
   email: z.string().optional(),
   q: z.string().optional(),
   sort: z.enum(["newest", "alphabetical", "last_emailed"]).optional(),
-  status: z.enum(["pending", "verified", "unsubscribed"]).optional(),
+  status: z
+    .enum(["pending", "verified", "unsubscribed", "bounced", "complained"])
+    .optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });

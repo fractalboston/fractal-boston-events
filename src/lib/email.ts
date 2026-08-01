@@ -15,7 +15,7 @@ import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 import type { LumaEvent } from "@/lib/luma";
 import { updateLastEmailedAt } from "@/lib/subscribers";
-import { getLumaEventUrl } from "@/lib/urls";
+import { getLumaEventUrl, joinAppUrl } from "@/lib/urls";
 
 let sesClient: SESClient | null = null;
 
@@ -65,27 +65,27 @@ function isQuotaError(error: unknown): boolean {
   );
 }
 
-async function sendEmailIfEnabled({
+async function sendViaSes({
   to,
   subject,
   html,
+  from,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
+  from: string;
+  replyTo?: string;
 }): Promise<void> {
-  if (!env.EMAIL_ENABLED) {
-    console.warn(`Trying to email ${to} but EMAIL_ENABLED is false`);
-    return;
-  }
-
   const ses = getSES();
   try {
     const params: SendEmailCommandInput = {
-      Source: EMAIL_FROM,
+      Source: from,
       Destination: {
         ToAddresses: [to],
       },
+      ReplyToAddresses: replyTo !== undefined ? [replyTo] : undefined,
       Message: {
         Subject: {
           Data: subject,
@@ -121,12 +121,52 @@ async function sendEmailIfEnabled({
   }
 }
 
+async function sendEmailIfEnabled({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  if (!env.EMAIL_ENABLED) {
+    console.warn(`Trying to email ${to} but EMAIL_ENABLED is false`);
+    return;
+  }
+
+  await sendViaSes({ to, subject, html, from: EMAIL_FROM });
+}
+
+/**
+ * Deliberately NOT gated on EMAIL_ENABLED: the broadcast send route enforces
+ * the dry-run gate explicitly before calling this, and test sends always
+ * deliver (mirroring sendTestEmail). Routing through the gated helper would
+ * silently no-op and let the send loop mark recipients sent with nothing
+ * delivered.
+ */
+export async function sendBroadcastEmail({
+  to,
+  subject,
+  html,
+  from,
+  replyTo,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  from: string;
+  replyTo?: string;
+}): Promise<void> {
+  await sendViaSes({ to, subject, html, from, replyTo });
+}
+
 export async function sendVerificationEmail(
   email: string,
   token: string,
   appUrl: string
 ): Promise<void> {
-  const verifyUrl = `${appUrl}/verify?token=${token}`;
+  const verifyUrl = joinAppUrl(appUrl, `/verify?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">Verify your subscription</h1>
@@ -152,7 +192,7 @@ export async function sendWelcomeEmail(
   events: LumaEvent[],
   appUrl: string
 ): Promise<void> {
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+  const unsubscribeUrl = joinAppUrl(appUrl, `/unsubscribe?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">Welcome to Fractal! 🎉</h1>
@@ -180,7 +220,7 @@ export async function sendAlreadySubscribedEmail(
   token: string,
   appUrl: string
 ): Promise<void> {
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+  const unsubscribeUrl = joinAppUrl(appUrl, `/unsubscribe?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">You're Subscribed</h1>
@@ -209,7 +249,7 @@ export async function sendWeeklyDigest(
   appUrl: string,
   skipLogging = false
 ): Promise<void> {
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+  const unsubscribeUrl = joinAppUrl(appUrl, `/unsubscribe?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">This Week at Fractal</h1>
@@ -243,7 +283,7 @@ export async function sendNewEventAlert(
   appUrl: string,
   skipLogging = false
 ): Promise<void> {
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${token}`;
+  const unsubscribeUrl = joinAppUrl(appUrl, `/unsubscribe?token=${token}`);
 
   const content = `
     <h1 style="font-size: 24px; margin-bottom: 16px;">New Event Alert! 🚀</h1>
@@ -426,46 +466,7 @@ export async function sendTestEmail(
   );
   const { from, subject, html } = getBasicEmailContent(events, true);
 
-  const ses = getSES();
-  try {
-    const params: SendEmailCommandInput = {
-      Source: from,
-      Destination: {
-        ToAddresses: [email],
-      },
-      Message: {
-        Subject: {
-          Data: subject,
-          Charset: "UTF-8",
-        },
-        Body: {
-          Html: {
-            Data: html,
-            Charset: "UTF-8",
-          },
-        },
-      },
-    };
-
-    const command = new SendEmailCommand(params);
-    const result = await ses.send(command);
-
-    if (result.MessageId === undefined || result.MessageId === "") {
-      throw new Error(
-        "SES API returned invalid response - email may not have been sent"
-      );
-    }
-  } catch (error) {
-    if (error instanceof SESQuotaError) {
-      throw error;
-    }
-    if (isQuotaError(error)) {
-      throw new SESQuotaError(
-        `SES quota exceeded: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-    throw error;
-  }
+  await sendViaSes({ to: email, subject, html, from });
 
   await sendDiscordInfo({
     webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,

@@ -13,9 +13,11 @@ import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendAlreadySubscribedEmail, sendVerificationEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import {
+  RESUBSCRIBE_ELIGIBLE_STATUSES,
   createSubscriber,
   getSubscriberByEmail,
   getSubscriberByToken,
+  isResubscribeEligible,
   verifySubscriber,
 } from "@/lib/subscribers";
 
@@ -61,13 +63,13 @@ export async function POST(request: Request): Promise<Response> {
           message: "Already subscribed",
         });
       }
-      if (existing.status === "unsubscribed") {
+      if (isResubscribeEligible(existing.status)) {
         // Set status back to pending and resend verification email
         const updated = await db
           .updateTable("subscribers")
           .set({ status: "pending" })
           .where("email", "=", existing.email.toLowerCase())
-          .where("status", "=", "unsubscribed")
+          .where("status", "in", RESUBSCRIBE_ELIGIBLE_STATUSES)
           .returningAll()
           .executeTakeFirst();
 
@@ -120,13 +122,13 @@ export async function POST(request: Request): Promise<Response> {
         });
       }
 
-      if (existing.status === "unsubscribed") {
+      if (isResubscribeEligible(existing.status)) {
         // Set status back to pending and resend verification email
         const updated = await db
           .updateTable("subscribers")
           .set({ status: "pending" })
           .where("email", "=", existing.email.toLowerCase())
-          .where("status", "=", "unsubscribed")
+          .where("status", "in", RESUBSCRIBE_ELIGIBLE_STATUSES)
           .returningAll()
           .executeTakeFirst();
 

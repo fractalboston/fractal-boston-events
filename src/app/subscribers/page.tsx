@@ -11,9 +11,10 @@ type Subscriber = {
   updated_at: string;
   email: string;
   token: string;
-  status: "pending" | "verified" | "unsubscribed";
+  status: "pending" | "verified" | "unsubscribed" | "bounced" | "complained";
   source: "form" | "luma" | "substack" | "manual";
   last_emailed_at: string | null;
+  last_broadcast_at: string | null;
 };
 
 type SearchResponse = {
@@ -50,6 +51,8 @@ const STATUSES: Subscriber["status"][] = [
   "pending",
   "verified",
   "unsubscribed",
+  "bounced",
+  "complained",
 ];
 const SEARCH_DEBOUNCE_MS = 500;
 const PAGE_SIZE = 50;
@@ -947,6 +950,12 @@ export default function SubscribersPage(): ReactElement {
                     <span style={style.detailKey}>last_emailed_at</span>
                     {selected.last_emailed_at !== null
                       ? new Date(selected.last_emailed_at).toISOString()
+                      : "never"}
+                  </div>
+                  <div style={style.detailRow}>
+                    <span style={style.detailKey}>last_broadcast_at</span>
+                    {selected.last_broadcast_at !== null
+                      ? new Date(selected.last_broadcast_at).toISOString()
                       : "never"}
                   </div>
                   <div style={{ marginTop: "16px", marginBottom: "8px" }}>
