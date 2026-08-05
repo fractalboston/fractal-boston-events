@@ -13,7 +13,7 @@ import {
   updateSenderIdentity,
 } from "@/lib/broadcasts";
 import { SENDER_EMAIL_DOMAIN } from "@/lib/constants";
-import { isDevelopment } from "@/lib/env";
+import { isSessionUser, requireSession } from "@/lib/passkey/requireSession";
 
 const createBodySchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -32,9 +32,10 @@ const updateBodySchema = z.object({
   replyTo: z.email().nullable().optional(),
 });
 
-export async function GET(): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+export async function GET(request: Request): Promise<Response> {
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     const identities = await listSenderIdentities();
@@ -47,8 +48,9 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     let body: unknown;
@@ -77,8 +79,9 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function PUT(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     let body: unknown;

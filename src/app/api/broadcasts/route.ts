@@ -10,7 +10,8 @@ import {
   getSenderIdentityById,
   listBroadcasts,
 } from "@/lib/broadcasts";
-import { env, isDevelopment } from "@/lib/env";
+import { env } from "@/lib/env";
+import { isSessionUser, requireSession } from "@/lib/passkey/requireSession";
 
 const createBodySchema = z.object({
   subject: z.string().trim().min(1).max(255),
@@ -18,9 +19,10 @@ const createBodySchema = z.object({
   senderIdentityId: z.guid("Invalid sender identity id"),
 });
 
-export async function GET(): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+export async function GET(request: Request): Promise<Response> {
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     const [broadcasts, verifiedCount] = await Promise.all([
@@ -40,8 +42,9 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     let body: unknown;

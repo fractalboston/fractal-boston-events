@@ -4,8 +4,9 @@ import {
   getBasicEmailContent,
   getDetailedEmailContent,
 } from "@/lib/email";
-import { env, isDevelopment } from "@/lib/env";
+import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
+import { isSessionUser, requireSession } from "@/lib/passkey/requireSession";
 
 function parseAsOfDate(dateStr: string | null): Date | null {
   if (dateStr === null || dateStr.trim() === "") return null;
@@ -22,8 +23,9 @@ function parseAsOfDate(dateStr: string | null): Date | null {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     const { searchParams } = new URL(request.url);

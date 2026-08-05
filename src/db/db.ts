@@ -81,11 +81,64 @@ export type BroadcastRecipientsTable = {
 };
 export type BroadcastRecipient = Degenerate<BroadcastRecipientsTable>;
 
+export type UsersTable = {
+  id: Generated<string>;
+  created_at: Generated<Date>;
+};
+export type User = Degenerate<UsersTable>;
+
+export type WebauthnCredentialsTable = {
+  credential_id: string;
+  user_id: string;
+  public_key: Buffer;
+  counter: number | string;
+  transports: string | null;
+  created_at: Generated<Date>;
+};
+export type WebauthnCredential = Degenerate<WebauthnCredentialsTable>;
+
+export type SessionsTable = {
+  id: Generated<string>;
+  user_id: string;
+  expires_at: Date;
+  created_at: Generated<Date>;
+};
+export type Session = Degenerate<SessionsTable>;
+
+export type InviteStatus = "pending" | "accepted";
+
+export type InvitesTable = {
+  token: Generated<string>;
+  label: string;
+  status: Generated<InviteStatus>;
+  created_by: string;
+  created_at: Generated<Date>;
+  expires_at: Date;
+  accepted_at: Date | null;
+  accepted_user_id: string | null;
+};
+export type Invite = Degenerate<InvitesTable>;
+
+export type AuthChallengesTable = {
+  id: Generated<string>;
+  challenge: string;
+  user_id: string | null;
+  invite_token: string | null;
+  expires_at: Date;
+  created_at: Generated<Date>;
+};
+export type AuthChallenge = Degenerate<AuthChallengesTable>;
+
 export type Database = {
   subscribers: SubscribersTable;
   sender_identities: SenderIdentitiesTable;
   broadcasts: BroadcastsTable;
   broadcast_recipients: BroadcastRecipientsTable;
+  users: UsersTable;
+  webauthn_credentials: WebauthnCredentialsTable;
+  sessions: SessionsTable;
+  invites: InvitesTable;
+  auth_challenges: AuthChallengesTable;
 };
 
 // Strip sslmode from URL so Pool's ssl config (rejectUnauthorized: false) is used.

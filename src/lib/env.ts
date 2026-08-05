@@ -12,6 +12,9 @@ export type Env = {
   POSTGRES_URL: string;
   APP_URL: string;
   EMAIL_ENABLED: boolean;
+  SESSION_SECRET: string;
+  WEBAUTHN_RP_ID?: string;
+  WEBAUTHN_RP_NAME: string;
   SUBSTACK_API_KEY?: string;
   CRON_SECRET?: string;
   ADMIN_API_KEY?: string;
@@ -36,6 +39,12 @@ const config: Env = {
   POSTGRES_URL: env.get("POSTGRES_URL").required().asString(),
   APP_URL: env.get("APP_URL").required().asUrlString(),
   EMAIL_ENABLED: env.get("EMAIL_ENABLED").default("false").asBool(),
+  SESSION_SECRET: env.get("SESSION_SECRET").required().asString(),
+  WEBAUTHN_RP_ID: env.get("WEBAUTHN_RP_ID").asString(),
+  WEBAUTHN_RP_NAME: env
+    .get("WEBAUTHN_RP_NAME")
+    .default("Fractal Events")
+    .asString(),
   SUBSTACK_API_KEY: env.get("SUBSTACK_API_KEY").asString(),
   CRON_SECRET: env.get("CRON_SECRET").asString(),
   ADMIN_API_KEY: env.get("ADMIN_API_KEY").asString(),

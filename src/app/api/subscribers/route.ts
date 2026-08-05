@@ -6,7 +6,7 @@ import {
   sendNotFound,
   sendSuccess,
 } from "@/lib/api-response";
-import { isDevelopment } from "@/lib/env";
+import { isSessionUser, requireSession } from "@/lib/passkey/requireSession";
 import { subscriberIdParamSchema } from "@/lib/subscriberToken";
 import {
   createSubscriber,
@@ -49,8 +49,9 @@ const listQuerySchema = z.object({
 });
 
 export async function GET(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     const { searchParams } = new URL(request.url);
@@ -98,8 +99,9 @@ const deleteBodySchema = z.object({
 });
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     let body: unknown;
@@ -130,8 +132,9 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function PUT(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     let body: unknown;
@@ -166,8 +169,9 @@ export async function PUT(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     let body: unknown;

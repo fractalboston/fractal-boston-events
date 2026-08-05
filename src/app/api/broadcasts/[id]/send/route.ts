@@ -28,7 +28,8 @@ import {
 } from "@/lib/broadcasts";
 import { sendDiscordInfo } from "@/lib/discord";
 import { SESQuotaError, sendBroadcastEmail } from "@/lib/email";
-import { env, isDevelopment } from "@/lib/env";
+import { env } from "@/lib/env";
+import { isSessionUser, requireSession } from "@/lib/passkey/requireSession";
 import { joinAppUrl } from "@/lib/urls";
 
 const idSchema = z.guid("Invalid broadcast id");
@@ -42,8 +43,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     const { id } = await params;

@@ -19,3 +19,5 @@ process.env.DISCORD_MOD_ROLE_ID =
 process.env.POSTGRES_URL =
   process.env.POSTGRES_URL ?? "postgresql://localhost:5432/test";
 process.env.APP_URL = process.env.APP_URL ?? dummyUrl;
+process.env.SESSION_SECRET =
+  process.env.SESSION_SECRET ?? "test-session-secret-for-vitest-only";

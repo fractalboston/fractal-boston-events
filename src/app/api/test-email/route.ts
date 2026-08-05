@@ -5,7 +5,7 @@ import {
   sendSuccess,
 } from "@/lib/api-response";
 import { sendTestEmail } from "@/lib/email";
-import { isDevelopment } from "@/lib/env";
+import { isSessionUser, requireSession } from "@/lib/passkey/requireSession";
 
 const requestSchema = z.object({
   email: z.email(),
@@ -26,8 +26,9 @@ function parseAsOfDate(dateStr: string): Date {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isDevelopment()) {
-    return new Response(null, { status: 404 });
+  const auth = await requireSession(request);
+  if (!isSessionUser(auth)) {
+    return auth;
   }
   try {
     let body: unknown;
