@@ -143,6 +143,11 @@ describe("buildBroadcastHtml", () => {
     expect(html).toContain('class="wordmark"');
     expect(html).toContain('class="footer"');
   });
+
+  it("uses near-black body text that survives Gmail's dark-mode inversion", () => {
+    expect(html).toContain("color: #333333");
+    expect(html).not.toContain("#444444");
+  });
 });
 
 describe("isAllowedSenderEmail", () => {

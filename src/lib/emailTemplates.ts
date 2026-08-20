@@ -114,7 +114,7 @@ export function wrapInEmailTemplate(body: string): string {
   `;
 }
 
-const EMAIL_TEXT_COLOR = "#444444";
+const EMAIL_TEXT_COLOR = "#333333";
 const EMAIL_CARD_BG = "#f0fdf4";
 // Brand emerald lightened for readable contrast on dark backgrounds only;
 // light mode keeps BRAND_COLOR everywhere.

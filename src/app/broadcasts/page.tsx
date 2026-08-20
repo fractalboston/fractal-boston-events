@@ -1364,7 +1364,7 @@ export default function BroadcastsPage(): ReactElement {
               <div style={style.guideRow}>
                 <div style={style.label}>Heading 1 — main title</div>
                 <code style={style.codeBlock}>
-                  {"<h1>Big announcement</h1>"}
+                  {'<h1 style="color:#059669;">Big announcement</h1>'}
                 </code>
                 <div style={style.exampleBox}>
                   <span style={style.guideHeading("28px")}>
@@ -1376,7 +1376,7 @@ export default function BroadcastsPage(): ReactElement {
               <div style={style.guideRow}>
                 <div style={style.label}>Heading 2 — section</div>
                 <code style={style.codeBlock}>
-                  {"<h2>What's happening</h2>"}
+                  {'<h2 style="color:#059669;">What\'s happening</h2>'}
                 </code>
                 <div style={style.exampleBox}>
                   <span style={style.guideHeading("22px")}>
@@ -1387,7 +1387,9 @@ export default function BroadcastsPage(): ReactElement {
 
               <div style={style.guideRow}>
                 <div style={style.label}>Heading 3 — subsection</div>
-                <code style={style.codeBlock}>{"<h3>The details</h3>"}</code>
+                <code style={style.codeBlock}>
+                  {'<h3 style="color:#059669;">The details</h3>'}
+                </code>
                 <div style={style.exampleBox}>
                   <span style={style.guideHeading("18px")}>The details</span>
                 </div>
@@ -1397,7 +1399,7 @@ export default function BroadcastsPage(): ReactElement {
                 <div style={style.label}>Paragraph with a link</div>
                 <code style={style.codeBlock}>
                   {
-                    '<p>Details are on <a href="https://lu.ma/fractalboston">our calendar</a>.</p>'
+                    '<p>Details are on <a href="https://lu.ma/fractalboston" style="color:#059669; font-weight:bold; text-decoration:underline;">our calendar</a>.</p>'
                   }
                 </code>
                 <div style={style.exampleBox}>
@@ -1410,7 +1412,7 @@ export default function BroadcastsPage(): ReactElement {
                 <div style={style.label}>Button</div>
                 <code style={style.codeBlock}>
                   {
-                    '<p><a class="button" href="https://lu.ma/fractalboston">📅 RSVP on Luma</a></p>'
+                    '<p><a class="button" href="https://lu.ma/fractalboston" style="display:inline-block; background-color:#059669; color:#ffffff; font-weight:bold; text-decoration:none; padding:12px 28px; border:3px solid #059669; border-radius:50px 15px / 15px 50px;">📅 RSVP on Luma</a></p>'
                   }
                 </code>
                 <div style={style.exampleBox}>
