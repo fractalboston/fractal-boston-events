@@ -20,7 +20,12 @@ const __dirname = path.dirname(__filename);
 const postgresUrl = env.get("POSTGRES_DIRECT_URL").required().asString();
 const pool = new Pool({
   connectionString: postgresUrl,
-  ssl: { rejectUnauthorized: false },
+  // Local Postgres (e.g. a scratch/rehearsal database) has no SSL; Supabase
+  // connections keep ssl with rejectUnauthorized false, matching db.ts
+  ssl:
+    new URL(postgresUrl).hostname === "localhost"
+      ? undefined
+      : { rejectUnauthorized: false },
 });
 
 const db = new Kysely<Database>({
