@@ -79,7 +79,7 @@ type IdentityResponse = {
 
 type BroadcastResponse = {
   success: boolean;
-  data?: { broadcast: Broadcast };
+  data?: { broadcast: Broadcast; warnings?: string[] };
   error?: string;
 };
 
@@ -91,6 +91,7 @@ type DetailResponse = {
     previewHtml: string;
     failedRecipients: BroadcastRecipient[];
     skippedRecipients: BroadcastRecipient[];
+    warnings?: string[];
   };
   error?: string;
 };
@@ -175,6 +176,7 @@ export default function BroadcastsPage(): ReactElement {
     text: string;
   } | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [contentWarnings, setContentWarnings] = useState<string[]>([]);
 
   const loadList = useCallback(async (): Promise<void> => {
     try {
@@ -227,6 +229,7 @@ export default function BroadcastsPage(): ReactElement {
         setSubject(data.data.broadcast.subject);
         setContent(data.data.broadcast.content);
         setSenderIdentityId(data.data.broadcast.sender_identity_id);
+        setContentWarnings(data.data.warnings ?? []);
         setNowMs(Date.now());
       } else {
         setDetail(null);
@@ -249,6 +252,7 @@ export default function BroadcastsPage(): ReactElement {
     setMessage(null);
     setDeleteArmed(false);
     setConfirmCount("");
+    setContentWarnings([]);
     setWizardStep(1);
     void loadDetail(broadcast.id);
   }
@@ -263,6 +267,7 @@ export default function BroadcastsPage(): ReactElement {
     setMessage(null);
     setDeleteArmed(false);
     setConfirmCount("");
+    setContentWarnings([]);
     setWizardStep(1);
   }
 
@@ -961,6 +966,17 @@ export default function BroadcastsPage(): ReactElement {
               );
             })}
           </div>
+          {contentWarnings.length > 0 && (
+            <div style={{ ...style.banner, margin: "16px 16px 0 16px" }}>
+              <strong>Content warnings</strong> — the draft still saves;
+              double-check these before sending:
+              <ul style={{ margin: "8px 0 0 0", paddingLeft: "20px" }}>
+                {contentWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {wizardStep === 1 && (
             <div style={style.cardBody}>
               <form
