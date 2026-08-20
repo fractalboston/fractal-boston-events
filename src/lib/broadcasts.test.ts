@@ -198,12 +198,10 @@ describe("canSendBroadcast", () => {
     ).toEqual({ ok: true });
   });
 
-  it("rejects a broadcast that is already sending", () => {
-    const result = canSendBroadcast({
-      status: "sending",
-      test_sent_at: testSentAt,
-    });
-    expect(result.ok).toBe(false);
+  it("allows resuming a sending broadcast (the claim arbitrates staleness)", () => {
+    expect(
+      canSendBroadcast({ status: "sending", test_sent_at: testSentAt })
+    ).toEqual({ ok: true });
   });
 });
 

@@ -7,6 +7,7 @@ import {
   BRAND_COLOR,
   EMAIL_FONT_STACK,
   SENDER_EMAIL_DOMAIN,
+  SENDING_RECLAIM_MS,
 } from "@/lib/constants";
 
 type SenderIdentity = {
@@ -173,6 +174,7 @@ export default function BroadcastsPage(): ReactElement {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const loadList = useCallback(async (): Promise<void> => {
     try {
@@ -225,6 +227,7 @@ export default function BroadcastsPage(): ReactElement {
         setSubject(data.data.broadcast.subject);
         setContent(data.data.broadcast.content);
         setSenderIdentityId(data.data.broadcast.sender_identity_id);
+        setNowMs(Date.now());
       } else {
         setDetail(null);
         setMessage({
@@ -528,11 +531,17 @@ export default function BroadcastsPage(): ReactElement {
 
   const broadcast = detail?.broadcast ?? null;
   const isDraft = broadcast !== null && broadcast.status === "draft";
+  // Display hint only - the server's claim query arbitrates real staleness
+  const staleSending =
+    broadcast !== null &&
+    broadcast.status === "sending" &&
+    nowMs - new Date(broadcast.updated_at).getTime() >= SENDING_RECLAIM_MS;
   const isSendable =
     broadcast !== null &&
     (broadcast.status === "draft" ||
       broadcast.status === "failed" ||
-      broadcast.status === "partial") &&
+      broadcast.status === "partial" ||
+      staleSending) &&
     broadcast.test_sent_at !== null;
   const sendConfirmed = confirmCount.trim() === String(verifiedCount);
   const isDirty =
@@ -1507,8 +1516,15 @@ export default function BroadcastsPage(): ReactElement {
         <div style={style.card}>
           <div style={style.cardHeader}>Actions</div>
           <div style={style.cardBody}>
+            {broadcast.status === "sending" && !staleSending && (
+              <p style={{ ...style.hint, marginTop: 0, marginBottom: "16px" }}>
+                A send appears to be in progress. If it was interrupted, Resume
+                becomes available after 10 minutes of inactivity.
+              </p>
+            )}
             {(broadcast.status === "failed" ||
-              broadcast.status === "partial") && (
+              broadcast.status === "partial" ||
+              staleSending) && (
               <div
                 style={{
                   display: "flex",
@@ -1545,7 +1561,11 @@ export default function BroadcastsPage(): ReactElement {
                     sendLoading || !isSendable || !sendConfirmed
                   )}
                 >
-                  {sendLoading ? "Sending…" : "Retry failed and resume"}
+                  {sendLoading
+                    ? "Sending…"
+                    : staleSending
+                      ? "Resume interrupted send"
+                      : "Retry failed and resume"}
                 </button>
               </div>
             )}

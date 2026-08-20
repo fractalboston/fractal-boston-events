@@ -66,7 +66,16 @@ export function editClearsTestApproval({
   );
 }
 
-const SENDABLE_STATUSES: BroadcastStatus[] = ["draft", "failed", "partial"];
+// "sending" is sendable so an interrupted send (crashed process, serverless
+// timeout) can be resumed. The atomic claim query is the authority on whether
+// a sending broadcast is actually stale: a fresh one fails the claim and the
+// route returns 409, so this cannot start a second concurrent send.
+const SENDABLE_STATUSES: BroadcastStatus[] = [
+  "draft",
+  "failed",
+  "partial",
+  "sending",
+];
 
 export function canSendBroadcast(
   broadcast: Pick<Broadcast, "status" | "test_sent_at">
