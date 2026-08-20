@@ -123,6 +123,26 @@ describe("buildBroadcastHtml", () => {
     expect(html).toContain(".button");
     expect(html).toContain("background-color: #059669");
   });
+
+  it("declares both color schemes and a dark-mode block", () => {
+    expect(html).toContain('content="light dark"');
+    expect(html).toContain("@media (prefers-color-scheme: dark)");
+  });
+
+  it("lightens the brand accent in dark mode only", () => {
+    const darkBlock = html.slice(
+      html.indexOf("@media (prefers-color-scheme: dark)")
+    );
+    expect(darkBlock).toContain("#34d399");
+    const lightBlock = html.slice(0, html.indexOf("@media (prefers-color"));
+    expect(lightBlock).not.toContain("#34d399");
+  });
+
+  it("keeps class hooks for the dark rules on the layout elements", () => {
+    expect(html).toContain('class="email-bg"');
+    expect(html).toContain('class="wordmark"');
+    expect(html).toContain('class="footer"');
+  });
 });
 
 describe("isAllowedSenderEmail", () => {
