@@ -45,6 +45,14 @@ export function toError(reason: unknown, fallback: string): Error {
   return new Error(stringifyErrorArg(reason) || fallback);
 }
 
+export function isIgnorableNodeWarning(error: Error): boolean {
+  if (error.name === "ExperimentalWarning") {
+    return true;
+  }
+
+  return error.message.includes("ExperimentalWarning:");
+}
+
 function getForwardingCount(): number {
   const count: unknown = Reflect.get(globalThis, FORWARDING_COUNT_FLAG);
   return typeof count === "number" ? count : 0;
@@ -66,6 +74,10 @@ export function reportRuntimeErrorToDiscord({
   error: Error;
   context: string;
 }): void {
+  if (isIgnorableNodeWarning(error)) {
+    return;
+  }
+
   // Prevent infinite loops if Discord forwarding itself logs errors.
   if (getForwardingCount() > 0) {
     return;
