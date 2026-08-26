@@ -35,10 +35,7 @@ export function registerProcessErrorHandlers(): void {
     });
   });
 
-  process.on("multipleResolves", (type, _promise, value) => {
-    reportRuntimeErrorToDiscord({
-      error: toError(value, `Promise ${type}`),
-      context: `Vercel process multipleResolves (${type})`,
-    });
-  });
+  // Do not listen for `multipleResolves`: Node deprecated/removed it (DEP0160)
+  // because Promise.all / Promise.race and framework internals trigger it as
+  // false positives. Forwarding it flooded Discord with noise.
 }
