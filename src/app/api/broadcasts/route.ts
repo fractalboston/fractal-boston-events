@@ -7,6 +7,7 @@ import {
 import {
   countVerifiedSubscribers,
   createBroadcast,
+  getContentWarnings,
   getSenderIdentityById,
   listBroadcasts,
 } from "@/lib/broadcasts";
@@ -62,7 +63,10 @@ export async function POST(request: Request): Promise<Response> {
       return sendBadRequest("Sender identity not found");
     }
     const broadcast = await createBroadcast(parsed.data);
-    return sendSuccess({ broadcast });
+    return sendSuccess({
+      broadcast,
+      warnings: getContentWarnings(broadcast.content),
+    });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     console.error("Broadcast create error:", err);

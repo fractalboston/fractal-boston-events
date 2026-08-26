@@ -9,6 +9,7 @@ import {
   buildBroadcastHtml,
   deleteBroadcastDraft,
   getBroadcastById,
+  getContentWarnings,
   getRecipientCounts,
   listBroadcastRecipients,
   updateBroadcastDraft,
@@ -58,6 +59,7 @@ export async function GET(
       previewHtml,
       failedRecipients,
       skippedRecipients,
+      warnings: getContentWarnings(broadcast.content),
     });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
@@ -97,7 +99,10 @@ export async function PUT(
     if (broadcast === undefined) {
       return sendNotFound("Draft broadcast not found");
     }
-    return sendSuccess({ broadcast });
+    return sendSuccess({
+      broadcast,
+      warnings: getContentWarnings(broadcast.content),
+    });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     console.error("Broadcast update error:", err);

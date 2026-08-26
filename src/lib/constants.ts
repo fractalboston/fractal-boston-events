@@ -7,4 +7,7 @@ export const SENDER_EMAIL_DOMAIN = "fractal.boston";
 // The site's display webfont (Fractul) can't be relied on in email clients.
 export const EMAIL_FONT_STACK =
   "Optima, Candara, 'Noto Sans', source-sans-pro, sans-serif";
+// Mirrors the reclaim interval in claimBroadcastForSending. Client-side this
+// is only a display hint - the claim query arbitrates actual staleness.
+export const SENDING_RECLAIM_MS = 10 * 60 * 1000;
 export const BRAND_COLOR = "#059669";

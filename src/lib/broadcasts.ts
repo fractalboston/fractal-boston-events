@@ -43,6 +43,91 @@ export function buildBroadcastHtml({
   return wrapInBroadcastTemplate({ content, unsubscribeUrl });
 }
 
+const INVISIBLE_CHAR_NAMES = new Map<number, string>([
+  [0x200b, "zero-width space"],
+  [0x200c, "zero-width non-joiner"],
+  [0x200d, "zero-width joiner"],
+  [0xfeff, "zero-width no-break space"],
+]);
+
+const TAG_ONLY_CHAR_NAMES = new Map<number, string>([
+  [0x2018, "curly single quote"],
+  [0x2019, "curly single quote"],
+  [0x201c, "curly double quote"],
+  [0x201d, "curly double quote"],
+  [0x00a0, "non-breaking space"],
+]);
+
+// Gmail clips messages over ~102KB, hiding everything below the fold -
+// including the unsubscribe footer
+export const RENDERED_SIZE_WARN_BYTES = 90_000;
+
+/**
+ * Warn about characters that silently break composed HTML. Invisible
+ * characters are flagged anywhere - they are pasted in unseen and a zero-width
+ * space inside an href makes the link dead while rendering as normal text.
+ * Curly quotes and non-breaking spaces are only flagged inside tags, where
+ * they break attribute parsing; in prose they are legitimate.
+ */
+export function findContentWarnings(content: string): string[] {
+  const tagSpans: [number, number][] = [];
+  // Quote-aware so a > inside a quoted attribute value does not end the tag
+  const tagPattern = /<(?:"[^"]*"|'[^']*'|[^"'>])*>/g;
+  let match: RegExpExecArray | null;
+  while ((match = tagPattern.exec(content)) !== null) {
+    tagSpans.push([match.index, match.index + match[0].length]);
+  }
+  const inTag = (index: number): boolean =>
+    tagSpans.some(([start, end]) => index >= start && index < end);
+
+  const warnings: string[] = [];
+  let line = 1;
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] === "\n") {
+      line++;
+      continue;
+    }
+    const code = content.charCodeAt(i);
+    const invisibleName = INVISIBLE_CHAR_NAMES.get(code);
+    if (invisibleName !== undefined) {
+      warnings.push(
+        inTag(i)
+          ? `Line ${String(line)}: ${invisibleName} inside an HTML tag - a link or attribute containing it will not work`
+          : `Line ${String(line)}: ${invisibleName} in text - invisible and usually pasted in by accident`
+      );
+      continue;
+    }
+    const tagOnlyName = TAG_ONLY_CHAR_NAMES.get(code);
+    if (tagOnlyName !== undefined && inTag(i)) {
+      warnings.push(
+        `Line ${String(line)}: ${tagOnlyName} inside an HTML tag - attributes quoted with it will not work`
+      );
+    }
+  }
+  return warnings;
+}
+
+export function checkRenderedSize(content: string): string | null {
+  const rendered = buildBroadcastHtml({
+    content,
+    unsubscribeUrl: "https://fractal.boston/unsubscribe?token=size-check",
+  });
+  const bytes = Buffer.byteLength(rendered, "utf8");
+  if (bytes < RENDERED_SIZE_WARN_BYTES) {
+    return null;
+  }
+  return `Rendered email is ${String(Math.round(bytes / 1024))}KB - Gmail clips messages over ~102KB, hiding the unsubscribe link`;
+}
+
+export function getContentWarnings(content: string): string[] {
+  const warnings = findContentWarnings(content);
+  const sizeWarning = checkRenderedSize(content);
+  if (sizeWarning !== null) {
+    warnings.push(sizeWarning);
+  }
+  return warnings;
+}
+
 /**
  * Editing the subject, content, or sender of a tested draft invalidates the
  * test approval - what was tested is no longer what would be sent.
@@ -66,7 +151,16 @@ export function editClearsTestApproval({
   );
 }
 
-const SENDABLE_STATUSES: BroadcastStatus[] = ["draft", "failed", "partial"];
+// "sending" is sendable so an interrupted send (crashed process, serverless
+// timeout) can be resumed. The atomic claim query is the authority on whether
+// a sending broadcast is actually stale: a fresh one fails the claim and the
+// route returns 409, so this cannot start a second concurrent send.
+const SENDABLE_STATUSES: BroadcastStatus[] = [
+  "draft",
+  "failed",
+  "partial",
+  "sending",
+];
 
 export function canSendBroadcast(
   broadcast: Pick<Broadcast, "status" | "test_sent_at">

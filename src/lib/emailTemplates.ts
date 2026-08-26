@@ -114,8 +114,11 @@ export function wrapInEmailTemplate(body: string): string {
   `;
 }
 
-const EMAIL_TEXT_COLOR = "#444444";
+const EMAIL_TEXT_COLOR = "#333333";
 const EMAIL_CARD_BG = "#f0fdf4";
+// Brand emerald lightened for readable contrast on dark backgrounds only;
+// light mode keeps BRAND_COLOR everywhere.
+const DARK_MODE_ACCENT = "#34d399";
 
 /**
  * Broadcast layout matching fractal.boston: brand wordmark header, pale green
@@ -147,8 +150,8 @@ export function wrapInBroadcastTemplate({
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="color-scheme" content="light">
-        <meta name="supported-color-schemes" content="light">
+        <meta name="color-scheme" content="light dark">
+        <meta name="supported-color-schemes" content="light dark">
         <style>
           a {
             color: ${BRAND_COLOR};
@@ -177,16 +180,34 @@ export function wrapInBroadcastTemplate({
               padding: 26px 20px !important;
             }
           }
+          @media (prefers-color-scheme: dark) {
+            body.email-bg, table.email-bg { background-color: #111111 !important; }
+            .card {
+              background-color: #14241c !important;
+              background-image: linear-gradient(145deg, #1b2f24 0%, #14241c 100%) !important;
+              color: #e8e8e8 !important;
+            }
+            h1, h2, h3 { color: ${DARK_MODE_ACCENT} !important; }
+            a { color: ${DARK_MODE_ACCENT} !important; }
+            .button {
+              background-color: ${BRAND_COLOR} !important;
+              color: #ffffff !important;
+              border-color: ${DARK_MODE_ACCENT} !important;
+              box-shadow: 4px 4px 0 rgba(52, 211, 153, 0.25) !important;
+            }
+            .wordmark { color: ${DARK_MODE_ACCENT} !important; }
+            .footer, .footer a { color: #9ca3af !important; }
+          }
         </style>
       </head>
-      <body style="margin: 0; padding: 0; background-color: #ffffff;" bgcolor="#ffffff">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff;" bgcolor="#ffffff">
+      <body class="email-bg" style="margin: 0; padding: 0; background-color: #ffffff;" bgcolor="#ffffff">
+        <table role="presentation" class="email-bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff;" bgcolor="#ffffff">
           <tr>
             <td align="center" style="padding: 28px 12px;">
               <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 600px;">
                 <tr>
                   <td align="center" style="padding: 0 4px 18px 4px;">
-                    <a href="${HOMEPAGE_URL}" style="font-family: ${EMAIL_FONT_STACK}; font-size: 26px; font-weight: bold; color: ${BRAND_COLOR}; text-decoration: none;">Fractal Boston</a>
+                    <a href="${HOMEPAGE_URL}" class="wordmark" style="font-family: ${EMAIL_FONT_STACK}; font-size: 26px; font-weight: bold; color: ${BRAND_COLOR}; text-decoration: none;">Fractal Boston</a>
                   </td>
                 </tr>
                 <tr>
@@ -195,7 +216,7 @@ export function wrapInBroadcastTemplate({
                   </td>
                 </tr>
                 <tr>
-                  <td align="center" style="padding: 22px 8px; font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 1.8; color: #6b7280; text-align: center;">
+                  <td align="center" class="footer" style="padding: 22px 8px; font-family: ${EMAIL_FONT_STACK}; font-size: 13px; line-height: 1.8; color: #6b7280; text-align: center;">
                     <a href="${HOMEPAGE_URL}" style="color: ${BRAND_COLOR}; font-weight: 600; text-decoration: none;">fractal.boston</a>
                     &nbsp;·&nbsp;
                     <a href="${CALENDAR_URL}" style="color: ${BRAND_COLOR}; font-weight: 600; text-decoration: none;">Calendar</a>

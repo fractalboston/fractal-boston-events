@@ -7,6 +7,7 @@ import {
   BRAND_COLOR,
   EMAIL_FONT_STACK,
   SENDER_EMAIL_DOMAIN,
+  SENDING_RECLAIM_MS,
 } from "@/lib/constants";
 
 type SenderIdentity = {
@@ -78,7 +79,7 @@ type IdentityResponse = {
 
 type BroadcastResponse = {
   success: boolean;
-  data?: { broadcast: Broadcast };
+  data?: { broadcast: Broadcast; warnings?: string[] };
   error?: string;
 };
 
@@ -90,6 +91,7 @@ type DetailResponse = {
     previewHtml: string;
     failedRecipients: BroadcastRecipient[];
     skippedRecipients: BroadcastRecipient[];
+    warnings?: string[];
   };
   error?: string;
 };
@@ -173,6 +175,8 @@ export default function BroadcastsPage(): ReactElement {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [contentWarnings, setContentWarnings] = useState<string[]>([]);
 
   const loadList = useCallback(async (): Promise<void> => {
     try {
@@ -225,6 +229,8 @@ export default function BroadcastsPage(): ReactElement {
         setSubject(data.data.broadcast.subject);
         setContent(data.data.broadcast.content);
         setSenderIdentityId(data.data.broadcast.sender_identity_id);
+        setContentWarnings(data.data.warnings ?? []);
+        setNowMs(Date.now());
       } else {
         setDetail(null);
         setMessage({
@@ -240,12 +246,27 @@ export default function BroadcastsPage(): ReactElement {
     }
   }, []);
 
+  // While a broadcast is sending, poll so heartbeat progress and the
+  // 10-minute resume threshold are reflected without a manual reload
+  useEffect(() => {
+    if (detail?.broadcast.status !== "sending" || selectedId === null) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      void loadDetail(selectedId);
+    }, 30_000);
+    return (): void => {
+      window.clearInterval(intervalId);
+    };
+  }, [detail?.broadcast.status, selectedId, loadDetail]);
+
   function handleSelect(broadcast: Broadcast): void {
     setSelectedId(broadcast.id);
     setDetail(null);
     setMessage(null);
     setDeleteArmed(false);
     setConfirmCount("");
+    setContentWarnings([]);
     setWizardStep(1);
     void loadDetail(broadcast.id);
   }
@@ -260,6 +281,7 @@ export default function BroadcastsPage(): ReactElement {
     setMessage(null);
     setDeleteArmed(false);
     setConfirmCount("");
+    setContentWarnings([]);
     setWizardStep(1);
   }
 
@@ -528,11 +550,17 @@ export default function BroadcastsPage(): ReactElement {
 
   const broadcast = detail?.broadcast ?? null;
   const isDraft = broadcast !== null && broadcast.status === "draft";
+  // Display hint only - the server's claim query arbitrates real staleness
+  const staleSending =
+    broadcast !== null &&
+    broadcast.status === "sending" &&
+    nowMs - new Date(broadcast.updated_at).getTime() >= SENDING_RECLAIM_MS;
   const isSendable =
     broadcast !== null &&
     (broadcast.status === "draft" ||
       broadcast.status === "failed" ||
-      broadcast.status === "partial") &&
+      broadcast.status === "partial" ||
+      staleSending) &&
     broadcast.test_sent_at !== null;
   const sendConfirmed = confirmCount.trim() === String(verifiedCount);
   const isDirty =
@@ -952,6 +980,17 @@ export default function BroadcastsPage(): ReactElement {
               );
             })}
           </div>
+          {contentWarnings.length > 0 && (
+            <div style={{ ...style.banner, margin: "16px 16px 0 16px" }}>
+              <strong>Content warnings</strong> — the draft still saves;
+              double-check these before sending:
+              <ul style={{ margin: "8px 0 0 0", paddingLeft: "20px" }}>
+                {contentWarnings.map((warning, index) => (
+                  <li key={`${String(index)}-${warning}`}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {wizardStep === 1 && (
             <div style={style.cardBody}>
               <form
@@ -1339,7 +1378,7 @@ export default function BroadcastsPage(): ReactElement {
               <div style={style.guideRow}>
                 <div style={style.label}>Heading 1 — main title</div>
                 <code style={style.codeBlock}>
-                  {"<h1>Big announcement</h1>"}
+                  {'<h1 style="color:#059669;">Big announcement</h1>'}
                 </code>
                 <div style={style.exampleBox}>
                   <span style={style.guideHeading("28px")}>
@@ -1351,7 +1390,7 @@ export default function BroadcastsPage(): ReactElement {
               <div style={style.guideRow}>
                 <div style={style.label}>Heading 2 — section</div>
                 <code style={style.codeBlock}>
-                  {"<h2>What's happening</h2>"}
+                  {'<h2 style="color:#059669;">What\'s happening</h2>'}
                 </code>
                 <div style={style.exampleBox}>
                   <span style={style.guideHeading("22px")}>
@@ -1362,7 +1401,9 @@ export default function BroadcastsPage(): ReactElement {
 
               <div style={style.guideRow}>
                 <div style={style.label}>Heading 3 — subsection</div>
-                <code style={style.codeBlock}>{"<h3>The details</h3>"}</code>
+                <code style={style.codeBlock}>
+                  {'<h3 style="color:#059669;">The details</h3>'}
+                </code>
                 <div style={style.exampleBox}>
                   <span style={style.guideHeading("18px")}>The details</span>
                 </div>
@@ -1372,7 +1413,7 @@ export default function BroadcastsPage(): ReactElement {
                 <div style={style.label}>Paragraph with a link</div>
                 <code style={style.codeBlock}>
                   {
-                    '<p>Details are on <a href="https://lu.ma/fractalboston">our calendar</a>.</p>'
+                    '<p>Details are on <a href="https://lu.ma/fractalboston" style="color:#059669; font-weight:bold; text-decoration:underline;">our calendar</a>.</p>'
                   }
                 </code>
                 <div style={style.exampleBox}>
@@ -1385,7 +1426,7 @@ export default function BroadcastsPage(): ReactElement {
                 <div style={style.label}>Button</div>
                 <code style={style.codeBlock}>
                   {
-                    '<p><a class="button" href="https://lu.ma/fractalboston">📅 RSVP on Luma</a></p>'
+                    '<p><a class="button" href="https://lu.ma/fractalboston" style="display:inline-block; background-color:#059669; color:#ffffff; font-weight:bold; text-decoration:none; padding:12px 28px; border:3px solid #059669; border-radius:50px 15px / 15px 50px;">📅 RSVP on Luma</a></p>'
                   }
                 </code>
                 <div style={style.exampleBox}>
@@ -1507,8 +1548,15 @@ export default function BroadcastsPage(): ReactElement {
         <div style={style.card}>
           <div style={style.cardHeader}>Actions</div>
           <div style={style.cardBody}>
+            {broadcast.status === "sending" && !staleSending && (
+              <p style={{ ...style.hint, marginTop: 0, marginBottom: "16px" }}>
+                A send appears to be in progress. If it was interrupted, Resume
+                becomes available after 10 minutes of inactivity.
+              </p>
+            )}
             {(broadcast.status === "failed" ||
-              broadcast.status === "partial") && (
+              broadcast.status === "partial" ||
+              staleSending) && (
               <div
                 style={{
                   display: "flex",
@@ -1545,7 +1593,11 @@ export default function BroadcastsPage(): ReactElement {
                     sendLoading || !isSendable || !sendConfirmed
                   )}
                 >
-                  {sendLoading ? "Sending…" : "Retry failed and resume"}
+                  {sendLoading
+                    ? "Sending…"
+                    : staleSending
+                      ? "Resume interrupted send"
+                      : "Retry failed and resume"}
                 </button>
               </div>
             )}

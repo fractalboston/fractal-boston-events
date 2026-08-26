@@ -2,13 +2,80 @@ import { describe, expect, it } from "vitest";
 import {
   buildBroadcastHtml,
   canSendBroadcast,
+  checkRenderedSize,
   editClearsTestApproval,
+  findContentWarnings,
   formatSenderFrom,
   formatTestSubject,
   isAllowedSenderEmail,
   resolveBroadcastFinalStatus,
 } from "@/lib/broadcasts";
 import { joinAppUrl } from "@/lib/urls";
+
+describe("findContentWarnings", () => {
+  it("flags a zero-width space inside an href (the production dead-link bug)", () => {
+    const content = `<a href="\u200bhttps://example.com">sign a waiver</a>`;
+    const warnings = findContentWarnings(content);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("zero-width space inside an HTML tag");
+  });
+
+  it("flags a zero-width space in prose as accidental", () => {
+    const warnings = findContentWarnings("<p>hello\u200bworld</p>");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("in text");
+  });
+
+  it("does not flag curly quotes in prose", () => {
+    expect(findContentWarnings("<p>“We’re excited” she said.</p>")).toEqual([]);
+  });
+
+  it("flags curly quotes used to quote an attribute", () => {
+    const warnings = findContentWarnings(
+      "<a href=“https://example.com”>link</a>"
+    );
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("curly double quote inside an HTML tag");
+  });
+
+  it("flags a non-breaking space only inside tags", () => {
+    expect(findContentWarnings("<p>hello\u00a0world</p>")).toEqual([]);
+    expect(
+      findContentWarnings('<a\u00a0href="https://example.com">x</a>')
+    ).toHaveLength(1);
+  });
+
+  it("still sees inside a tag when a quoted attribute contains >", () => {
+    const warnings = findContentWarnings(
+      '<a title="1 > 0" href=“https://example.com”>link</a>'
+    );
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("curly double quote inside an HTML tag");
+  });
+
+  it("reports the line number", () => {
+    const warnings = findContentWarnings("<p>ok</p>\n<p>ok</p>\n<p>\u200b</p>");
+    expect(warnings[0]).toContain("Line 3");
+  });
+
+  it("returns nothing for clean content", () => {
+    expect(
+      findContentWarnings('<h1>Hi</h1><p><a href="https://x.com">go</a></p>')
+    ).toEqual([]);
+  });
+});
+
+describe("checkRenderedSize", () => {
+  it("passes normal-sized content", () => {
+    expect(checkRenderedSize("<p>Short announcement.</p>")).toBeNull();
+  });
+
+  it("warns when the rendered email approaches Gmail's clip limit", () => {
+    const warning = checkRenderedSize(`<p>${"a".repeat(95_000)}</p>`);
+    expect(warning).not.toBeNull();
+    expect(warning).toContain("Gmail clips");
+  });
+});
 
 describe("joinAppUrl", () => {
   it("joins a base URL without a trailing slash", () => {
@@ -63,6 +130,31 @@ describe("buildBroadcastHtml", () => {
   it("provides a site-style button class", () => {
     expect(html).toContain(".button");
     expect(html).toContain("background-color: #059669");
+  });
+
+  it("declares both color schemes and a dark-mode block", () => {
+    expect(html).toContain('content="light dark"');
+    expect(html).toContain("@media (prefers-color-scheme: dark)");
+  });
+
+  it("lightens the brand accent in dark mode only", () => {
+    const darkBlock = html.slice(
+      html.indexOf("@media (prefers-color-scheme: dark)")
+    );
+    expect(darkBlock).toContain("#34d399");
+    const lightBlock = html.slice(0, html.indexOf("@media (prefers-color"));
+    expect(lightBlock).not.toContain("#34d399");
+  });
+
+  it("keeps class hooks for the dark rules on the layout elements", () => {
+    expect(html).toContain('class="email-bg"');
+    expect(html).toContain('class="wordmark"');
+    expect(html).toContain('class="footer"');
+  });
+
+  it("uses near-black body text that survives Gmail's dark-mode inversion", () => {
+    expect(html).toContain("color: #333333");
+    expect(html).not.toContain("#444444");
   });
 });
 
@@ -198,12 +290,10 @@ describe("canSendBroadcast", () => {
     ).toEqual({ ok: true });
   });
 
-  it("rejects a broadcast that is already sending", () => {
-    const result = canSendBroadcast({
-      status: "sending",
-      test_sent_at: testSentAt,
-    });
-    expect(result.ok).toBe(false);
+  it("allows resuming a sending broadcast (the claim arbitrates staleness)", () => {
+    expect(
+      canSendBroadcast({ status: "sending", test_sent_at: testSentAt })
+    ).toEqual({ ok: true });
   });
 });
 

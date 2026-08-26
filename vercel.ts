@@ -6,6 +6,9 @@ import type { VercelConfig } from "@vercel/config/v1";
  */
 export const config: VercelConfig = {
   functions: {
+    "src/app/api/broadcasts/[id]/send/route.ts": {
+      maxDuration: 300,
+    },
     "src/app/api/cron/email-weekly/route.ts": {
       maxDuration: 300,
     },
