@@ -246,6 +246,20 @@ export default function BroadcastsPage(): ReactElement {
     }
   }, []);
 
+  // While a broadcast is sending, poll so heartbeat progress and the
+  // 10-minute resume threshold are reflected without a manual reload
+  useEffect(() => {
+    if (detail?.broadcast.status !== "sending" || selectedId === null) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      void loadDetail(selectedId);
+    }, 30_000);
+    return (): void => {
+      window.clearInterval(intervalId);
+    };
+  }, [detail?.broadcast.status, selectedId, loadDetail]);
+
   function handleSelect(broadcast: Broadcast): void {
     setSelectedId(broadcast.id);
     setDetail(null);
@@ -971,8 +985,8 @@ export default function BroadcastsPage(): ReactElement {
               <strong>Content warnings</strong> — the draft still saves;
               double-check these before sending:
               <ul style={{ margin: "8px 0 0 0", paddingLeft: "20px" }}>
-                {contentWarnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
+                {contentWarnings.map((warning, index) => (
+                  <li key={`${String(index)}-${warning}`}>{warning}</li>
                 ))}
               </ul>
             </div>

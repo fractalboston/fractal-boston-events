@@ -45,6 +45,14 @@ describe("findContentWarnings", () => {
     ).toHaveLength(1);
   });
 
+  it("still sees inside a tag when a quoted attribute contains >", () => {
+    const warnings = findContentWarnings(
+      '<a title="1 > 0" href=“https://example.com”>link</a>'
+    );
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("curly double quote inside an HTML tag");
+  });
+
   it("reports the line number", () => {
     const warnings = findContentWarnings("<p>ok</p>\n<p>ok</p>\n<p>\u200b</p>");
     expect(warnings[0]).toContain("Line 3");

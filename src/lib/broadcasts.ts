@@ -71,7 +71,8 @@ export const RENDERED_SIZE_WARN_BYTES = 90_000;
  */
 export function findContentWarnings(content: string): string[] {
   const tagSpans: [number, number][] = [];
-  const tagPattern = /<[^>]*>/g;
+  // Quote-aware so a > inside a quoted attribute value does not end the tag
+  const tagPattern = /<(?:"[^"]*"|'[^']*'|[^"'>])*>/g;
   let match: RegExpExecArray | null;
   while ((match = tagPattern.exec(content)) !== null) {
     tagSpans.push([match.index, match.index + match[0].length]);

@@ -108,10 +108,14 @@ export async function POST(
     const replyTo = claimed.sent_reply_to ?? identity.reply_to;
     await stampBroadcastSender({ id: claimed.id, from, replyTo });
 
-    // The audience is frozen at the first claim: resumes and retries complete
-    // the original audience rather than adding subscribers who verified after
-    // the send started
-    if (broadcast.status === "draft") {
+    // The audience is frozen at the first successful snapshot: resumes and
+    // retries complete the original audience rather than adding subscribers
+    // who verified after the send started. Keyed on whether recipient rows
+    // exist rather than pre-claim status, so a crash between claim and
+    // snapshot cannot produce a broadcast that finalizes as sent with no
+    // recipients
+    const preCounts = await getRecipientCounts(claimed.id);
+    if (preCounts.totalCount === 0) {
       await snapshotBroadcastRecipients(claimed.id);
     }
     // Reset only after a successful claim so a request that loses the race
