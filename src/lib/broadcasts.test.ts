@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONFIRM_URL_PLACEHOLDER,
+  applyConfirmUrl,
+  broadcastAudienceStatuses,
   buildBroadcastHtml,
   canSendBroadcast,
   checkRenderedSize,
+  describeAudience,
   editClearsTestApproval,
+  findAudienceWarnings,
   findContentWarnings,
   formatSenderFrom,
   formatTestSubject,
@@ -202,11 +207,153 @@ describe("formatTestSubject", () => {
   });
 });
 
+describe("broadcastAudienceStatuses", () => {
+  it("is all-verified for untagged broadcasts regardless of scope", () => {
+    expect(
+      broadcastAudienceStatuses({ audience_tag: null, audience_scope: "all" })
+    ).toEqual(["verified"]);
+    expect(
+      broadcastAudienceStatuses({
+        audience_tag: null,
+        audience_scope: "verified",
+      })
+    ).toEqual(["verified"]);
+  });
+
+  it("maps tagged scopes to their status sets", () => {
+    expect(
+      broadcastAudienceStatuses({
+        audience_tag: "expo",
+        audience_scope: "verified",
+      })
+    ).toEqual(["verified"]);
+    expect(
+      broadcastAudienceStatuses({ audience_tag: "expo", audience_scope: "all" })
+    ).toEqual(["verified", "pending"]);
+    expect(
+      broadcastAudienceStatuses({
+        audience_tag: "expo",
+        audience_scope: "pending",
+      })
+    ).toEqual(["pending"]);
+  });
+});
+
+describe("describeAudience", () => {
+  it("describes the default audience", () => {
+    expect(
+      describeAudience({ audience_tag: null, audience_scope: "verified" })
+    ).toBe("all verified subscribers");
+  });
+
+  it("describes tagged audiences with their scope", () => {
+    expect(
+      describeAudience({ audience_tag: "expo", audience_scope: "all" })
+    ).toBe('subscribers tagged "expo" (confirmed + unconfirmed)');
+    expect(
+      describeAudience({ audience_tag: "expo", audience_scope: "pending" })
+    ).toBe('subscribers tagged "expo" (unconfirmed only)');
+    expect(
+      describeAudience({ audience_tag: "expo", audience_scope: "verified" })
+    ).toBe('subscribers tagged "expo" (confirmed only)');
+  });
+});
+
+describe("applyConfirmUrl", () => {
+  it("replaces every occurrence of the placeholder", () => {
+    const content = `<a href="${CONFIRM_URL_PLACEHOLDER}">yes</a><p>${CONFIRM_URL_PLACEHOLDER}</p>`;
+    const result = applyConfirmUrl({
+      content,
+      confirmUrl: "https://fractal.boston/verify?token=abc",
+    });
+    expect(result).not.toContain(CONFIRM_URL_PLACEHOLDER);
+    expect(
+      result.split("https://fractal.boston/verify?token=abc")
+    ).toHaveLength(3);
+  });
+
+  it("leaves content without the placeholder unchanged", () => {
+    expect(
+      applyConfirmUrl({ content: "<p>hi</p>", confirmUrl: "https://x.com" })
+    ).toBe("<p>hi</p>");
+  });
+});
+
+describe("findAudienceWarnings", () => {
+  const confirmButton = `<a class="button" href="${CONFIRM_URL_PLACEHOLDER}">Yes</a>`;
+
+  it("warns when the audience includes unconfirmed but content has no confirm link", () => {
+    const warnings = findAudienceWarnings({
+      content: "<p>hello</p>",
+      audience_tag: "expo",
+      audience_scope: "all",
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("no way to confirm");
+  });
+
+  it("warns when a confirm link goes to a confirmed-only audience", () => {
+    const warnings = findAudienceWarnings({
+      content: confirmButton,
+      audience_tag: null,
+      audience_scope: "verified",
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("already confirmed");
+  });
+
+  it("is quiet when a confirm link matches an unconfirmed-inclusive audience", () => {
+    expect(
+      findAudienceWarnings({
+        content: confirmButton,
+        audience_tag: "expo",
+        audience_scope: "pending",
+      })
+    ).toEqual([]);
+  });
+
+  it("is quiet for a plain broadcast to the default audience", () => {
+    expect(
+      findAudienceWarnings({
+        content: "<p>hello</p>",
+        audience_tag: null,
+        audience_scope: "verified",
+      })
+    ).toEqual([]);
+  });
+
+  it("flags a misspelled placeholder with its line number", () => {
+    const warnings = findAudienceWarnings({
+      content: '<p>ok</p>\n<a href="{{confirmurl}}">yes</a>',
+      audience_tag: null,
+      audience_scope: "verified",
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Line 2");
+    expect(warnings[0]).toContain("{{confirmurl}}");
+  });
+
+  it("flags a placeholder corrupted by an invisible character", () => {
+    // A zero-width space pasted inside the placeholder breaks the exact-match
+    // substitution - the same class of bug as the production dead link
+    const warnings = findAudienceWarnings({
+      content: '<a href="{{confirm​url}}">yes</a>',
+      audience_tag: "expo",
+      audience_scope: "all",
+    });
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("unrecognized placeholder");
+    expect(warnings[1]).toContain("no way to confirm");
+  });
+});
+
 describe("editClearsTestApproval", () => {
   const broadcast = {
     subject: "Subject",
     content: "<p>Body</p>",
     sender_identity_id: "11111111-1111-1111-1111-111111111111",
+    audience_tag: null,
+    audience_scope: "verified" as const,
   };
 
   it("clears approval when subject changes", () => {
@@ -236,6 +383,33 @@ describe("editClearsTestApproval", () => {
         },
       })
     ).toBe(true);
+  });
+
+  it("clears approval when the audience tag changes", () => {
+    expect(
+      editClearsTestApproval({
+        broadcast,
+        updates: { audienceTag: "expo-oct-2026" },
+      })
+    ).toBe(true);
+  });
+
+  it("clears approval when the audience scope changes", () => {
+    expect(
+      editClearsTestApproval({
+        broadcast: { ...broadcast, audience_tag: "expo-oct-2026" },
+        updates: { audienceScope: "all" },
+      })
+    ).toBe(true);
+  });
+
+  it("keeps approval when the audience is unchanged", () => {
+    expect(
+      editClearsTestApproval({
+        broadcast,
+        updates: { audienceTag: null, audienceScope: "verified" },
+      })
+    ).toBe(false);
   });
 
   it("keeps approval when values are unchanged", () => {

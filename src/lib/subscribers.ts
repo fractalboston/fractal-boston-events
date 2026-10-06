@@ -1,4 +1,5 @@
 import { sql } from "kysely";
+import { z } from "zod";
 import { db } from "@/db/db";
 import type { Subscriber, SubscriberStatus } from "@/db/db";
 import {
@@ -304,6 +305,125 @@ export async function deleteSubscriber(id: string): Promise<boolean> {
     .where("id", "=", normalizedId)
     .executeTakeFirst();
   return Number(result.numDeletedRows) > 0;
+}
+
+/**
+ * Tags are lowercase slugs (e.g. "expo-oct-2026") so the same audience can
+ * never fragment across case or whitespace variants of one name.
+ */
+export const subscriberTagSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(
+    /^[a-z0-9][a-z0-9-]{0,99}$/,
+    "Tag must be lowercase letters, numbers, and hyphens"
+  );
+
+export type TagSummary = {
+  tag: string;
+  verifiedCount: number;
+  pendingCount: number;
+  totalCount: number;
+};
+
+export async function listSubscriberTags(): Promise<TagSummary[]> {
+  return db
+    .selectFrom("subscriber_tags")
+    .innerJoin("subscribers", "subscribers.id", "subscriber_tags.subscriber_id")
+    .select([
+      "subscriber_tags.tag as tag",
+      sql<number>`count(*) filter (where subscribers.status = 'verified')::int`.as(
+        "verifiedCount"
+      ),
+      sql<number>`count(*) filter (where subscribers.status = 'pending')::int`.as(
+        "pendingCount"
+      ),
+      sql<number>`count(*)::int`.as("totalCount"),
+    ])
+    .groupBy("subscriber_tags.tag")
+    .orderBy("subscriber_tags.tag", "asc")
+    .execute();
+}
+
+export async function tagSubscriber({
+  subscriberId,
+  tag,
+}: {
+  subscriberId: string;
+  tag: string;
+}): Promise<void> {
+  await db
+    .insertInto("subscriber_tags")
+    .values({ subscriber_id: subscriberId, tag })
+    .onConflict((oc) => oc.columns(["subscriber_id", "tag"]).doNothing())
+    .execute();
+}
+
+export type ImportSubscribersResult = {
+  added: string[];
+  alreadySubscribed: string[];
+  suppressed: { email: string; status: SubscriberStatus }[];
+};
+
+/**
+ * Import a pasted list of emails as tagged subscribers.
+ * - New addresses are created pending/manual: they receive nothing until a
+ *   tagged broadcast deliberately includes unconfirmed subscribers, and they
+ *   join the regular list only by clicking their own confirm link.
+ * - Addresses already on the list (pending or verified) are tagged only.
+ * - Addresses that unsubscribed, bounced, or complained are skipped entirely
+ *   and reported - an import never resurrects a suppressed address.
+ */
+export async function importSubscribers({
+  emails,
+  tag,
+}: {
+  emails: string[];
+  tag: string;
+}): Promise<ImportSubscribersResult> {
+  const result: ImportSubscribersResult = {
+    added: [],
+    alreadySubscribed: [],
+    suppressed: [],
+  };
+  const seen = new Set<string>();
+
+  for (const raw of emails) {
+    const email = raw.trim().toLowerCase();
+    if (email === "" || seen.has(email)) {
+      continue;
+    }
+    seen.add(email);
+
+    let existing = await getSubscriberByEmail(email);
+    if (existing === undefined) {
+      const created = await createSubscriber({
+        email,
+        source: "manual",
+        status: "pending",
+      });
+      if (created !== undefined) {
+        await tagSubscriber({ subscriberId: created.id, tag });
+        result.added.push(email);
+        continue;
+      }
+      // Lost a creation race - re-read and fall through to the existing path
+      existing = await getSubscriberByEmail(email);
+      if (existing === undefined) {
+        continue;
+      }
+    }
+
+    if (existing.status === "pending" || existing.status === "verified") {
+      await tagSubscriber({ subscriberId: existing.id, tag });
+      result.alreadySubscribed.push(email);
+    } else {
+      result.suppressed.push({ email, status: existing.status });
+    }
+  }
+
+  return result;
 }
 
 /**

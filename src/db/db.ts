@@ -37,12 +37,27 @@ export type SenderIdentitiesTable = {
 };
 export type SenderIdentity = Degenerate<SenderIdentitiesTable>;
 
+export type SubscriberTagsTable = {
+  subscriber_id: string;
+  tag: string;
+  created_at: Generated<Date>;
+};
+export type SubscriberTag = Degenerate<SubscriberTagsTable>;
+
 export type BroadcastStatus =
   | "draft"
   | "sending"
   | "sent"
   | "partial"
   | "failed";
+
+/**
+ * Which subscriber statuses a tagged broadcast reaches: confirmed only,
+ * confirmed plus unconfirmed, or unconfirmed only (e.g. a confirmation
+ * reminder). Only meaningful when audience_tag is set - untagged broadcasts
+ * always go to all verified subscribers.
+ */
+export type BroadcastAudienceScope = "verified" | "all" | "pending";
 
 export type BroadcastsTable = {
   id: Generated<string>;
@@ -52,6 +67,8 @@ export type BroadcastsTable = {
   content: string;
   status: Generated<BroadcastStatus>;
   sender_identity_id: string;
+  audience_tag: string | null;
+  audience_scope: Generated<BroadcastAudienceScope>;
   test_sent_to: string | null;
   test_sent_at: Date | null;
   sent_at: Date | null;
@@ -131,6 +148,7 @@ export type AuthChallenge = Degenerate<AuthChallengesTable>;
 
 export type Database = {
   subscribers: SubscribersTable;
+  subscriber_tags: SubscriberTagsTable;
   sender_identities: SenderIdentitiesTable;
   broadcasts: BroadcastsTable;
   broadcast_recipients: BroadcastRecipientsTable;
