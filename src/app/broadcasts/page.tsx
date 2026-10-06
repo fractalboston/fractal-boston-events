@@ -21,6 +21,8 @@ type SenderIdentity = {
 
 type BroadcastStatus = "draft" | "sending" | "sent" | "partial" | "failed";
 
+type AudienceScope = "verified" | "all" | "pending";
+
 type Broadcast = {
   id: string;
   created_at: string;
@@ -29,6 +31,8 @@ type Broadcast = {
   content: string;
   status: BroadcastStatus;
   sender_identity_id: string;
+  audience_tag: string | null;
+  audience_scope: AudienceScope;
   test_sent_to: string | null;
   test_sent_at: string | null;
   sent_at: string | null;
@@ -88,11 +92,25 @@ type DetailResponse = {
   data?: {
     broadcast: Broadcast;
     counts: RecipientCounts;
+    audienceCount: number;
     previewHtml: string;
     failedRecipients: BroadcastRecipient[];
     skippedRecipients: BroadcastRecipient[];
     warnings?: string[];
   };
+  error?: string;
+};
+
+type TagSummary = {
+  tag: string;
+  verifiedCount: number;
+  pendingCount: number;
+  totalCount: number;
+};
+
+type TagsResponse = {
+  success: boolean;
+  data?: { tags: TagSummary[] };
   error?: string;
 };
 
@@ -153,6 +171,10 @@ export default function BroadcastsPage(): ReactElement {
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
   const [senderIdentityId, setSenderIdentityId] = useState("");
+  // "" means the default audience: all verified subscribers
+  const [audienceTag, setAudienceTag] = useState("");
+  const [audienceScope, setAudienceScope] = useState<AudienceScope>("verified");
+  const [tags, setTags] = useState<TagSummary[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -180,13 +202,16 @@ export default function BroadcastsPage(): ReactElement {
 
   const loadList = useCallback(async (): Promise<void> => {
     try {
-      const [listResponse, identitiesResponse] = await Promise.all([
-        fetch("/api/broadcasts"),
-        fetch("/api/sender-identities"),
-      ]);
+      const [listResponse, identitiesResponse, tagsResponse] =
+        await Promise.all([
+          fetch("/api/broadcasts"),
+          fetch("/api/sender-identities"),
+          fetch("/api/subscribers/tags"),
+        ]);
       const listData = (await listResponse.json()) as ListResponse;
       const identitiesData =
         (await identitiesResponse.json()) as IdentitiesResponse;
+      const tagsData = (await tagsResponse.json()) as TagsResponse;
       if (listData.success && listData.data !== undefined) {
         setBroadcasts(listData.data.broadcasts);
         setVerifiedCount(listData.data.verifiedCount);
@@ -199,6 +224,9 @@ export default function BroadcastsPage(): ReactElement {
       }
       if (identitiesData.success && identitiesData.data !== undefined) {
         setIdentities(identitiesData.data.identities);
+      }
+      if (tagsData.success && tagsData.data !== undefined) {
+        setTags(tagsData.data.tags);
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -229,6 +257,8 @@ export default function BroadcastsPage(): ReactElement {
         setSubject(data.data.broadcast.subject);
         setContent(data.data.broadcast.content);
         setSenderIdentityId(data.data.broadcast.sender_identity_id);
+        setAudienceTag(data.data.broadcast.audience_tag ?? "");
+        setAudienceScope(data.data.broadcast.audience_scope);
         setContentWarnings(data.data.warnings ?? []);
         setNowMs(Date.now());
       } else {
@@ -278,6 +308,8 @@ export default function BroadcastsPage(): ReactElement {
     setSubject("");
     setContent("");
     setSenderIdentityId(identities[0]?.id ?? "");
+    setAudienceTag("");
+    setAudienceScope("verified");
     setMessage(null);
     setDeleteArmed(false);
     setConfirmCount("");
@@ -299,7 +331,13 @@ export default function BroadcastsPage(): ReactElement {
         {
           method: isNew ? "POST" : "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subject, content, senderIdentityId }),
+          body: JSON.stringify({
+            subject,
+            content,
+            senderIdentityId,
+            audienceTag: audienceTag === "" ? null : audienceTag,
+            audienceScope: audienceTag === "" ? "verified" : audienceScope,
+          }),
         }
       );
       const data = (await response.json()) as BroadcastResponse;
@@ -347,7 +385,9 @@ export default function BroadcastsPage(): ReactElement {
         ? true
         : subject !== current.subject ||
           content !== current.content ||
-          senderIdentityId !== current.sender_identity_id;
+          senderIdentityId !== current.sender_identity_id ||
+          (audienceTag === "" ? null : audienceTag) !== current.audience_tag ||
+          (audienceTag !== "" && audienceScope !== current.audience_scope);
     if (wizardStep === 1 && dirty) {
       current = await saveDraft();
       if (current === null) return;
@@ -562,13 +602,39 @@ export default function BroadcastsPage(): ReactElement {
       broadcast.status === "partial" ||
       staleSending) &&
     broadcast.test_sent_at !== null;
-  const sendConfirmed = confirmCount.trim() === String(verifiedCount);
+  // Live audience size for the saved broadcast; the server re-checks the
+  // typed confirmation against the same count
+  const sendAudienceCount = detail?.audienceCount ?? verifiedCount;
+  const sendConfirmed = confirmCount.trim() === String(sendAudienceCount);
   const isDirty =
     broadcast === null
       ? true
       : subject !== broadcast.subject ||
         content !== broadcast.content ||
-        senderIdentityId !== broadcast.sender_identity_id;
+        senderIdentityId !== broadcast.sender_identity_id ||
+        (audienceTag === "" ? null : audienceTag) !== broadcast.audience_tag ||
+        (audienceTag !== "" && audienceScope !== broadcast.audience_scope);
+  const selectedTagSummary = tags.find((t) => t.tag === audienceTag);
+  const scopeCounts =
+    selectedTagSummary === undefined
+      ? null
+      : {
+          verified: selectedTagSummary.verifiedCount,
+          all:
+            selectedTagSummary.verifiedCount + selectedTagSummary.pendingCount,
+          pending: selectedTagSummary.pendingCount,
+        };
+  const savedAudienceTag = broadcast?.audience_tag ?? null;
+  const audienceDescription =
+    savedAudienceTag === null
+      ? "all verified subscribers"
+      : `subscribers tagged "${savedAudienceTag}" (${
+          broadcast?.audience_scope === "all"
+            ? "confirmed + unconfirmed"
+            : broadcast?.audience_scope === "pending"
+              ? "unconfirmed only"
+              : "confirmed only"
+        })`;
   const maxUnlockedStep: WizardStep =
     broadcast === null || !isDraft
       ? 1
@@ -848,10 +914,10 @@ export default function BroadcastsPage(): ReactElement {
       </Link>
       <h1 style={style.h1}>Broadcasts</h1>
       <p style={style.description}>
-        Send one-off emails to all verified subscribers — unsubscribed, bounced,
-        and complained addresses are excluded automatically. Each broadcast goes
-        through compose → preview → test send → send. Broadcasts send
-        immediately; there is no scheduling.
+        Send one-off emails to all verified subscribers, or to a tagged audience
+        — unsubscribed, bounced, and complained addresses are excluded
+        automatically. Each broadcast goes through compose → preview → test send
+        → send. Broadcasts send immediately; there is no scheduling.
       </p>
 
       {!emailEnabled && !listLoading && (
@@ -1038,6 +1104,84 @@ export default function BroadcastsPage(): ReactElement {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div style={{ marginBottom: "12px" }}>
+                  <label htmlFor="broadcast-audience" style={style.label}>
+                    Send to
+                  </label>
+                  <select
+                    id="broadcast-audience"
+                    value={audienceTag}
+                    onChange={(e) => {
+                      setAudienceTag(e.target.value);
+                      setAudienceScope("verified");
+                    }}
+                    disabled={saveLoading}
+                    style={{ ...style.input, width: "100%", maxWidth: "420px" }}
+                  >
+                    <option value="">
+                      All verified subscribers ({String(verifiedCount)})
+                    </option>
+                    {tags.map((t) => (
+                      <option key={t.tag} value={t.tag}>
+                        Tag: {t.tag} ({String(t.verifiedCount)} confirmed,{" "}
+                        {String(t.pendingCount)} unconfirmed)
+                      </option>
+                    ))}
+                  </select>
+                  {audienceTag !== "" && (
+                    <div style={{ marginTop: "8px" }}>
+                      {(
+                        [
+                          {
+                            value: "verified",
+                            label: `Confirmed only (${String(scopeCounts?.verified ?? 0)})`,
+                          },
+                          {
+                            value: "all",
+                            label: `Confirmed + unconfirmed (${String(scopeCounts?.all ?? 0)})`,
+                          },
+                          {
+                            value: "pending",
+                            label: `Unconfirmed only (${String(scopeCounts?.pending ?? 0)})`,
+                          },
+                        ] satisfies { value: AudienceScope; label: string }[]
+                      ).map((option) => (
+                        <label
+                          key={option.value}
+                          style={{
+                            display: "block",
+                            fontSize: "13px",
+                            color: "#374151",
+                            marginBottom: "4px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="audience-scope"
+                            value={option.value}
+                            checked={audienceScope === option.value}
+                            onChange={() => {
+                              setAudienceScope(option.value);
+                            }}
+                            disabled={saveLoading}
+                            style={{ marginRight: "6px" }}
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                      {audienceScope !== "verified" && (
+                        <p style={{ ...style.hint, marginTop: "6px" }}>
+                          This audience includes unconfirmed (pending)
+                          subscribers — people imported from a list who have not
+                          yet opted in. Include a confirm button (see the
+                          formatting guide) so they can join the regular list;
+                          they receive nothing else until they do.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ marginBottom: "12px" }}>
                   <label htmlFor="broadcast-content" style={style.label}>
@@ -1262,14 +1406,14 @@ export default function BroadcastsPage(): ReactElement {
               </div>
               <div style={{ ...style.summaryRow, marginBottom: "16px" }}>
                 <span style={style.summaryKey}>Audience</span>
-                {String(verifiedCount)} verified subscribers (unsubscribed,
-                bounced, and complained are excluded)
+                {String(sendAudienceCount)} {audienceDescription} (unsubscribed,
+                bounced, and complained are always excluded)
               </div>
               {emailEnabled ? (
                 <div style={{ ...style.banner, marginBottom: "16px" }}>
                   Sending is immediate: emails go out to all{" "}
-                  {String(verifiedCount)} verified subscribers the moment you
-                  click Send. There is no scheduling and no undo.
+                  {String(sendAudienceCount)} subscribers in this audience the
+                  moment you click Send. There is no scheduling and no undo.
                 </div>
               ) : (
                 <div style={{ ...style.banner, marginBottom: "16px" }}>
@@ -1290,7 +1434,7 @@ export default function BroadcastsPage(): ReactElement {
               >
                 <div>
                   <label htmlFor="confirm-count" style={style.label}>
-                    Type the recipient count ({String(verifiedCount)}) to
+                    Type the recipient count ({String(sendAudienceCount)}) to
                     confirm
                   </label>
                   <input
@@ -1301,7 +1445,7 @@ export default function BroadcastsPage(): ReactElement {
                       setConfirmCount(e.target.value);
                     }}
                     disabled={sendLoading || !isSendable}
-                    placeholder={String(verifiedCount)}
+                    placeholder={String(sendAudienceCount)}
                     style={{ ...style.input, width: "240px" }}
                   />
                 </div>
@@ -1318,7 +1462,7 @@ export default function BroadcastsPage(): ReactElement {
                   {sendLoading
                     ? "Sending…"
                     : emailEnabled
-                      ? `Send now to ${String(verifiedCount)} subscribers`
+                      ? `Send now to ${String(sendAudienceCount)} subscribers`
                       : "Run dry-run report"}
                 </button>
               </div>
@@ -1433,6 +1577,26 @@ export default function BroadcastsPage(): ReactElement {
                   <span style={style.guideButton}>📅 RSVP on Luma</span>
                 </div>
               </div>
+
+              <div style={style.guideRow}>
+                <div style={style.label}>
+                  Confirm button — for audiences that include unconfirmed
+                  subscribers
+                </div>
+                <code style={style.codeBlock}>
+                  {
+                    '<p><a class="button" href="{{confirm_url}}" style="display:inline-block; background-color:#059669; color:#ffffff; font-weight:bold; text-decoration:none; padding:12px 28px; border:3px solid #059669; border-radius:50px 15px / 15px 50px;">Yes, keep me posted</a></p>'
+                  }
+                </code>
+                <div style={style.exampleBox}>
+                  <span style={style.guideButton}>Yes, keep me posted</span>
+                </div>
+                <p style={{ ...style.hint, marginBottom: 0 }}>
+                  {
+                    "{{confirm_url}} is replaced per recipient with their own confirm link. Clicking it adds them to the regular list and sends the welcome email; in test sends and previews it's an inert placeholder link."
+                  }
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -1480,6 +1644,12 @@ export default function BroadcastsPage(): ReactElement {
               {broadcast.sent_at !== null
                 ? new Date(broadcast.sent_at).toISOString()
                 : "—"}
+            </div>
+            <div style={{ marginBottom: "8px" }}>
+              <span style={{ color: "#6b7280", marginRight: "8px" }}>
+                audience
+              </span>
+              {audienceDescription}
             </div>
             {detail !== null && (
               <div style={{ marginBottom: "8px" }}>
@@ -1568,7 +1738,7 @@ export default function BroadcastsPage(): ReactElement {
               >
                 <div>
                   <label htmlFor="confirm-count" style={style.label}>
-                    Type the recipient count ({String(verifiedCount)}) to
+                    Type the recipient count ({String(sendAudienceCount)}) to
                     confirm
                   </label>
                   <input
@@ -1579,7 +1749,7 @@ export default function BroadcastsPage(): ReactElement {
                       setConfirmCount(e.target.value);
                     }}
                     disabled={sendLoading || !isSendable}
-                    placeholder={String(verifiedCount)}
+                    placeholder={String(sendAudienceCount)}
                     style={{ ...style.input, width: "240px" }}
                   />
                 </div>

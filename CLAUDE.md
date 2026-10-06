@@ -78,6 +78,7 @@ A serverless API for managing email subscriptions and notifications for Fractal 
 - **Weekly digest** every Saturday 8am EST
 - **New event alerts** when event added <7 days out
 - **One-off broadcasts** composed on the dev-only `/broadcasts` admin page: sent to all verified subscribers from a chosen sender identity, with a mandatory test send first. Broadcasts update `last_broadcast_at` (not `last_emailed_at`) so recipients still get the weekly digest.
+- **Tagged audiences** for broadcasts: emails imported in bulk on `/subscribers` get a tag and enter as `pending` (unconfirmed) — they receive nothing by default. A broadcast can target a tag, optionally including unconfirmed subscribers (e.g. an expo signup list), whose `{{confirm_url}}` placeholder becomes each recipient's own verify link; clicking it makes them a regular verified subscriber. Imports never resurrect unsubscribed or suppressed addresses.
 - **Suppression statuses** `bounced` and `complained` (set manually from `/subscribers`) exclude an address from all sends without conflating it with an unsubscribe
 - **Email footer** includes links to:
   - [fractal.boston](https://fractal.boston)

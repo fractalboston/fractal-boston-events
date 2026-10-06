@@ -46,6 +46,35 @@ type DeleteResponse = {
   error?: string;
 };
 
+type TagSummary = {
+  tag: string;
+  verifiedCount: number;
+  pendingCount: number;
+  totalCount: number;
+};
+
+type TagsResponse = {
+  success: boolean;
+  data?: { tags: TagSummary[] };
+  error?: string;
+};
+
+type ImportResult = {
+  tag: string;
+  added: string[];
+  alreadySubscribed: string[];
+  suppressed: { email: string; status: string }[];
+  invalid: string[];
+};
+
+type ImportResponse = {
+  success: boolean;
+  data?: ImportResult;
+  error?: string;
+};
+
+const IMPORT_MAX_EMAILS = 1000;
+
 const SOURCES: Subscriber["source"][] = ["form", "luma", "substack", "manual"];
 const STATUSES: Subscriber["status"][] = [
   "pending",
@@ -88,6 +117,12 @@ export default function SubscribersPage(): ReactElement {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showAddSubscriberForm, setShowAddSubscriberForm] = useState(false);
+  const [showImportForm, setShowImportForm] = useState(false);
+  const [importEmailsText, setImportEmailsText] = useState("");
+  const [importTag, setImportTag] = useState("");
+  const [existingTags, setExistingTags] = useState<TagSummary[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const activeSearchControllerRef = useRef<AbortController | null>(null);
@@ -402,6 +437,88 @@ export default function SubscribersPage(): ReactElement {
       setMessage({ type: "error", text: err.message });
     } finally {
       setCreateLoading(false);
+    }
+  }
+
+  const loadTags = useCallback(async (): Promise<void> => {
+    try {
+      const response = await fetch("/api/subscribers/tags");
+      const data = (await response.json()) as TagsResponse;
+      if (data.success && data.data?.tags !== undefined) {
+        setExistingTags(data.data.tags);
+      }
+    } catch {
+      // Tag suggestions are a convenience; the import form works without them
+    }
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadTags();
+    }, 0);
+
+    return (): void => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [loadTags]);
+
+  async function handleImport(
+    e: Parameters<React.SubmitEventHandler<HTMLFormElement>>[0]
+  ): Promise<void> {
+    e.preventDefault();
+    const emails = importEmailsText
+      .split(/[\n,]+/)
+      .map((line) => line.trim())
+      .filter((line) => line !== "");
+    if (emails.length === 0) {
+      setMessage({ type: "error", text: "Paste at least one email address." });
+      return;
+    }
+    if (emails.length > IMPORT_MAX_EMAILS) {
+      setMessage({
+        type: "error",
+        text: `Import at most ${String(IMPORT_MAX_EMAILS)} addresses at a time.`,
+      });
+      return;
+    }
+    const tag = importTag.trim().toLowerCase();
+    if (tag === "") {
+      setMessage({ type: "error", text: "Enter a tag for this import." });
+      return;
+    }
+    setImportLoading(true);
+    setMessage(null);
+    setImportResult(null);
+    try {
+      const response = await fetch("/api/subscribers/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails, tag }),
+      });
+      const data = (await response.json()) as ImportResponse;
+      if (data.success && data.data !== undefined) {
+        setImportResult(data.data);
+        setImportEmailsText("");
+        setMessage({
+          type: "success",
+          text: `Imported tag "${data.data.tag}": ${String(data.data.added.length)} added as unconfirmed, ${String(data.data.alreadySubscribed.length)} already subscribed (tagged), ${String(data.data.suppressed.length)} suppressed skipped, ${String(data.data.invalid.length)} invalid.`,
+        });
+        void loadTags();
+        void runSearch({
+          q: debouncedQuery,
+          sortBy: sort,
+          status: statusFilter,
+          offset: 0,
+          append: false,
+        });
+      } else {
+        setMessage({ type: "error", text: data.error ?? "Import failed" });
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setImportLoading(false);
     }
   }
 
@@ -901,6 +1018,159 @@ export default function SubscribersPage(): ReactElement {
                       {createLoading ? "Adding…" : "Add"}
                     </button>
                   </form>
+                </div>
+              )}
+            </div>
+
+            <div style={{ ...style.card, marginBottom: "20px" }}>
+              <div
+                style={style.cardHeader}
+                onClick={() => {
+                  setShowImportForm(!showImportForm);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setShowImportForm(!showImportForm);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <span>Import List (tagged)</span>
+                <span
+                  style={{
+                    ...style.chevron,
+                    transform: showImportForm
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                  }}
+                >
+                  ▼
+                </span>
+              </div>
+              {showImportForm && (
+                <div style={{ padding: "16px" }}>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      color: "#6b7280",
+                      marginTop: 0,
+                      marginBottom: "12px",
+                    }}
+                  >
+                    New addresses are imported as <strong>pending</strong>{" "}
+                    (unconfirmed): they receive nothing until a tagged broadcast
+                    deliberately includes unconfirmed subscribers, and they join
+                    the regular list only by clicking their confirm link.
+                    Addresses already on the list are tagged; unsubscribed,
+                    bounced, or complained addresses are skipped.
+                  </p>
+                  <form
+                    onSubmit={(e) => {
+                      void handleImport(e);
+                    }}
+                  >
+                    <div style={{ marginBottom: "12px" }}>
+                      <label htmlFor="import-emails" style={style.label}>
+                        Email addresses (one per line)
+                      </label>
+                      <textarea
+                        id="import-emails"
+                        value={importEmailsText}
+                        onChange={(e) => {
+                          setImportEmailsText(e.target.value);
+                        }}
+                        placeholder={"alex@example.com\nsam@example.com"}
+                        disabled={importLoading}
+                        rows={6}
+                        style={{
+                          ...style.input,
+                          width: "100%",
+                          fontFamily: "monospace",
+                          fontSize: "13px",
+                          resize: "vertical",
+                        }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "12px",
+                        alignItems: "flex-end",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+                        <label htmlFor="import-tag" style={style.label}>
+                          Tag (pick existing or type a new one)
+                        </label>
+                        <input
+                          id="import-tag"
+                          type="text"
+                          list="existing-tags"
+                          value={importTag}
+                          onChange={(e) => {
+                            setImportTag(e.target.value);
+                          }}
+                          placeholder="e.g. expo-oct-2026"
+                          disabled={importLoading}
+                          style={{ ...style.input, width: "100%" }}
+                        />
+                        <datalist id="existing-tags">
+                          {existingTags.map((t) => (
+                            <option key={t.tag} value={t.tag}>
+                              {`${t.tag} (${String(t.totalCount)} subscriber${t.totalCount !== 1 ? "s" : ""})`}
+                            </option>
+                          ))}
+                        </datalist>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={importLoading}
+                        style={{
+                          ...style.button(importLoading),
+                          flexShrink: 0,
+                        }}
+                      >
+                        {importLoading ? "Importing…" : "Import"}
+                      </button>
+                    </div>
+                  </form>
+                  {importResult !== null &&
+                    (importResult.suppressed.length > 0 ||
+                      importResult.invalid.length > 0) && (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          fontSize: "13px",
+                          color: "#374151",
+                        }}
+                      >
+                        {importResult.suppressed.length > 0 && (
+                          <div style={{ marginBottom: "8px" }}>
+                            <strong>
+                              Skipped (previously opted out or suppressed):
+                            </strong>
+                            {importResult.suppressed.map((s) => (
+                              <div key={s.email} style={style.token}>
+                                {s.email} ({s.status})
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {importResult.invalid.length > 0 && (
+                          <div>
+                            <strong>Invalid lines (not imported):</strong>
+                            {importResult.invalid.map((line) => (
+                              <div key={line} style={style.token}>
+                                {line}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                 </div>
               )}
             </div>
