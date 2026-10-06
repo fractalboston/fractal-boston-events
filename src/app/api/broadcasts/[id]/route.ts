@@ -6,16 +6,19 @@ import {
   sendSuccess,
 } from "@/lib/api-response";
 import {
+  applyConfirmUrl,
   buildBroadcastHtml,
+  countAudienceSubscribers,
   deleteBroadcastDraft,
   getBroadcastById,
-  getContentWarnings,
+  getBroadcastWarnings,
   getRecipientCounts,
   listBroadcastRecipients,
   updateBroadcastDraft,
 } from "@/lib/broadcasts";
 import { env } from "@/lib/env";
 import { isSessionUser, requireSession } from "@/lib/passkey/requireSession";
+import { subscriberTagSchema } from "@/lib/subscribers";
 import { joinAppUrl } from "@/lib/urls";
 
 const idSchema = z.guid("Invalid broadcast id");
@@ -24,6 +27,8 @@ const updateBodySchema = z.object({
   subject: z.string().trim().min(1).max(255).optional(),
   content: z.string().min(1).optional(),
   senderIdentityId: z.guid("Invalid sender identity id").optional(),
+  audienceTag: subscriberTagSchema.nullable().optional(),
+  audienceScope: z.enum(["verified", "all", "pending"]).optional(),
 });
 
 export async function GET(
@@ -44,22 +49,36 @@ export async function GET(
     if (broadcast === undefined) {
       return sendNotFound("Broadcast not found");
     }
-    const [counts, failedRecipients, skippedRecipients] = await Promise.all([
-      getRecipientCounts(broadcast.id),
-      listBroadcastRecipients({ broadcastId: broadcast.id, status: "failed" }),
-      listBroadcastRecipients({ broadcastId: broadcast.id, status: "skipped" }),
-    ]);
+    const [counts, audienceCount, failedRecipients, skippedRecipients] =
+      await Promise.all([
+        getRecipientCounts(broadcast.id),
+        countAudienceSubscribers(broadcast),
+        listBroadcastRecipients({
+          broadcastId: broadcast.id,
+          status: "failed",
+        }),
+        listBroadcastRecipients({
+          broadcastId: broadcast.id,
+          status: "skipped",
+        }),
+      ]);
+    // The preview substitutes an inert confirm link so the button renders
+    // and is clickable without verifying anyone
     const previewHtml = buildBroadcastHtml({
-      content: broadcast.content,
+      content: applyConfirmUrl({
+        content: broadcast.content,
+        confirmUrl: joinAppUrl(env.APP_URL, "/verify?token=preview"),
+      }),
       unsubscribeUrl: joinAppUrl(env.APP_URL, "/unsubscribe?token=preview"),
     });
     return sendSuccess({
       broadcast,
       counts,
+      audienceCount,
       previewHtml,
       failedRecipients,
       skippedRecipients,
-      warnings: getContentWarnings(broadcast.content),
+      warnings: getBroadcastWarnings(broadcast),
     });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
@@ -101,7 +120,7 @@ export async function PUT(
     }
     return sendSuccess({
       broadcast,
-      warnings: getContentWarnings(broadcast.content),
+      warnings: getBroadcastWarnings(broadcast),
     });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
