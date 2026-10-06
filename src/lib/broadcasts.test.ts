@@ -12,6 +12,7 @@ import {
   findContentWarnings,
   formatSenderFrom,
   formatTestSubject,
+  getBroadcastWarnings,
   isAllowedSenderEmail,
   resolveBroadcastFinalStatus,
 } from "@/lib/broadcasts";
@@ -344,6 +345,30 @@ describe("findAudienceWarnings", () => {
     expect(warnings).toHaveLength(2);
     expect(warnings[0]).toContain("unrecognized placeholder");
     expect(warnings[1]).toContain("no way to confirm");
+  });
+});
+
+describe("getBroadcastWarnings", () => {
+  it("warns when a placeholder lands in the subject line", () => {
+    const warnings = getBroadcastWarnings({
+      subject: "Confirm now {{confirm_url}}",
+      content: "<p>hi</p>",
+      audience_tag: null,
+      audience_scope: "verified",
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("subject line");
+  });
+
+  it("is quiet for a clean broadcast", () => {
+    expect(
+      getBroadcastWarnings({
+        subject: "Hello",
+        content: "<p>hi</p>",
+        audience_tag: null,
+        audience_scope: "verified",
+      })
+    ).toEqual([]);
   });
 });
 

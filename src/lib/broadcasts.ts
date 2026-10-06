@@ -224,12 +224,21 @@ export function findAudienceWarnings(
 }
 
 export function getBroadcastWarnings(
-  broadcast: Pick<Broadcast, "content" | "audience_tag" | "audience_scope">
+  broadcast: Pick<
+    Broadcast,
+    "subject" | "content" | "audience_tag" | "audience_scope"
+  >
 ): string[] {
-  return [
+  const warnings = [
     ...getContentWarnings(broadcast.content),
     ...findAudienceWarnings(broadcast),
   ];
+  if (broadcast.subject.includes("{{")) {
+    warnings.push(
+      "The subject line contains {{ - placeholders are only substituted in the content, so it would be sent as literal text"
+    );
+  }
+  return warnings;
 }
 
 /**
@@ -476,16 +485,18 @@ export async function updateBroadcastDraft({
     updates.sender_identity_id = senderIdentityId;
   }
   if (audienceTag !== undefined) updates.audience_tag = audienceTag;
-  if (audienceScope !== undefined) updates.audience_scope = audienceScope;
   // Clearing the tag always resets the scope - an untagged broadcast is
-  // all-verified by definition
+  // all-verified by definition. Normalized before the approval check so a
+  // scope "change" that normalization discards cannot clear test approval.
+  let normalizedScope = audienceScope;
   if (audienceTag !== undefined || audienceScope !== undefined) {
     const finalTag =
       audienceTag !== undefined ? audienceTag : existing.audience_tag;
     if (finalTag === null) {
-      updates.audience_scope = "verified";
+      normalizedScope = "verified";
     }
   }
+  if (normalizedScope !== undefined) updates.audience_scope = normalizedScope;
 
   if (Object.keys(updates).length === 0) {
     return existing;
@@ -499,7 +510,7 @@ export async function updateBroadcastDraft({
         content,
         senderIdentityId,
         audienceTag,
-        audienceScope,
+        audienceScope: normalizedScope,
       },
     })
   ) {

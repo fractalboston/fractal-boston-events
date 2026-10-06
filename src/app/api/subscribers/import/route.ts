@@ -34,7 +34,8 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // Invalid lines are reported back, not fatal - a pasted list with one
-    // typo should import the rest
+    // typo should import the rest. The 254-char cap is the practical email
+    // maximum and keeps every address inside the column width.
     const valid: string[] = [];
     const invalid: string[] = [];
     for (const raw of parsed.data.emails) {
@@ -42,10 +43,10 @@ export async function POST(request: Request): Promise<Response> {
       if (email === "") {
         continue;
       }
-      if (emailSchema.safeParse(email).success) {
+      if (email.length <= 254 && emailSchema.safeParse(email).success) {
         valid.push(email);
       } else {
-        invalid.push(raw.trim());
+        invalid.push(raw.trim().slice(0, 100));
       }
     }
 
