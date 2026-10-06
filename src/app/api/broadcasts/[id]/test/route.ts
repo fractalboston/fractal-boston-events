@@ -6,6 +6,7 @@ import {
   sendSuccess,
 } from "@/lib/api-response";
 import {
+  applyConfirmUrl,
   buildBroadcastHtml,
   formatSenderFrom,
   formatTestSubject,
@@ -62,8 +63,14 @@ export async function POST(
       return sendInternalError("Sender identity not found");
     }
 
+    // The dummy token keeps the confirm button clickable in a test send
+    // without verifying anyone - it lands on the verify page's invalid-token
+    // state
     const html = buildBroadcastHtml({
-      content: broadcast.content,
+      content: applyConfirmUrl({
+        content: broadcast.content,
+        confirmUrl: joinAppUrl(env.APP_URL, "/verify?token=test"),
+      }),
       unsubscribeUrl: joinAppUrl(env.APP_URL, "/unsubscribe?token=test"),
     });
     const subject = formatTestSubject(broadcast.subject);

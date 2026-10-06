@@ -7,10 +7,13 @@ import {
   sendSuccess,
 } from "@/lib/api-response";
 import {
+  applyConfirmUrl,
+  broadcastAudienceStatuses,
   buildBroadcastHtml,
   canSendBroadcast,
   claimBroadcastForSending,
-  countVerifiedSubscribers,
+  countAudienceSubscribers,
+  describeAudience,
   finalizeBroadcast,
   formatSenderFrom,
   getBroadcastById,
@@ -78,10 +81,19 @@ export async function POST(
 
     // The typed-count confirmation is enforced here, not just in the UI, so a
     // scripted call cannot bypass it
-    const recipientCount = await countVerifiedSubscribers();
+    const recipientCount = await countAudienceSubscribers(broadcast);
     if (parsed.data.confirmRecipientCount !== recipientCount) {
       return sendBadRequest(
-        `Recipient count confirmation mismatch: there are currently ${String(recipientCount)} verified subscribers`
+        `Recipient count confirmation mismatch: this broadcast's audience (${describeAudience(broadcast)}) currently has ${String(recipientCount)} subscribers`
+      );
+    }
+
+    // A first send to an empty audience would finalize as "sent" to nobody
+    // and become unsendable - a mistyped tag should fail loudly instead.
+    // Resumes are exempt: their audience is already frozen in recipient rows.
+    if (recipientCount === 0 && broadcast.status === "draft") {
+      return sendBadRequest(
+        `This broadcast's audience (${describeAudience(broadcast)}) currently has 0 subscribers`
       );
     }
 
@@ -89,7 +101,7 @@ export async function POST(
       return sendSuccess({
         dryRun: true,
         recipientCount,
-        message: `Dry run - EMAIL_ENABLED is false. Would send to ${String(recipientCount)} verified subscribers. Nothing was sent and no state was changed.`,
+        message: `Dry run - EMAIL_ENABLED is false. Would send to ${String(recipientCount)} subscribers (${describeAudience(broadcast)}). Nothing was sent and no state was changed.`,
       });
     }
 
@@ -116,7 +128,7 @@ export async function POST(
     // recipients
     const preCounts = await getRecipientCounts(claimed.id);
     if (preCounts.totalCount === 0) {
-      await snapshotBroadcastRecipients(claimed.id);
+      await snapshotBroadcastRecipients(claimed);
     }
     // Reset only after a successful claim so a request that loses the race
     // cannot flip rows out from under the winner
@@ -129,6 +141,12 @@ export async function POST(
 
     const pending = await getPendingRecipients(claimed.id);
 
+    // The same status set the snapshot used, re-applied per recipient at send
+    // time - a subscriber may have unsubscribed or bounced between snapshot
+    // and a resumed send, and a pending subscriber who confirmed mid-campaign
+    // drops out of an unconfirmed-only reminder
+    const eligibleStatuses = broadcastAudienceStatuses(claimed);
+
     const successEmails: string[] = [];
     let quotaAborted = false;
     let processed = 0;
@@ -140,15 +158,14 @@ export async function POST(
       if (processed % 25 === 0) {
         await touchBroadcast(claimed.id);
       }
-      // Re-check eligibility at send time - a subscriber may have unsubscribed
-      // or bounced between snapshot and a resumed send
       if (
         recipient.subscriberToken === null ||
-        recipient.subscriberStatus !== "verified"
+        recipient.subscriberStatus === null ||
+        !eligibleStatuses.includes(recipient.subscriberStatus)
       ) {
         await markRecipientSkipped({
           id: recipient.id,
-          reason: "No longer a verified subscriber",
+          reason: "No longer in this broadcast's audience",
         });
         continue;
       }
@@ -158,8 +175,12 @@ export async function POST(
           env.APP_URL,
           `/unsubscribe?token=${recipient.subscriberToken}`
         );
+        const confirmUrl = joinAppUrl(
+          env.APP_URL,
+          `/verify?token=${recipient.subscriberToken}`
+        );
         const html = buildBroadcastHtml({
-          content: claimed.content,
+          content: applyConfirmUrl({ content: claimed.content, confirmUrl }),
           unsubscribeUrl,
         });
         await sendBroadcastEmail({

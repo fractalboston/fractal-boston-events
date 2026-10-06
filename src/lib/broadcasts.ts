@@ -2,6 +2,7 @@ import { sql } from "kysely";
 import { db } from "@/db/db";
 import type {
   Broadcast,
+  BroadcastAudienceScope,
   BroadcastRecipient,
   BroadcastStatus,
   SenderIdentity,
@@ -41,6 +42,60 @@ export function buildBroadcastHtml({
   unsubscribeUrl: string;
 }): string {
   return wrapInBroadcastTemplate({ content, unsubscribeUrl });
+}
+
+/**
+ * The one placeholder substituted into broadcast content, replaced per
+ * recipient with their own verify link so unconfirmed (pending) subscribers
+ * can confirm onto the list. Substitution is an exact string match - the
+ * audience warnings flag any other {{...}} pattern as a likely typo.
+ */
+export const CONFIRM_URL_PLACEHOLDER = "{{confirm_url}}";
+
+export function applyConfirmUrl({
+  content,
+  confirmUrl,
+}: {
+  content: string;
+  confirmUrl: string;
+}): string {
+  return content.replaceAll(CONFIRM_URL_PLACEHOLDER, confirmUrl);
+}
+
+type BroadcastAudience = Pick<Broadcast, "audience_tag" | "audience_scope">;
+
+/**
+ * Subscriber statuses a broadcast's audience includes. Untagged broadcasts
+ * always reach all verified subscribers; the scope only widens or narrows a
+ * tagged audience. Used by the snapshot, the audience count, and the
+ * send-time eligibility re-check so the three can never disagree.
+ */
+export function broadcastAudienceStatuses(
+  audience: BroadcastAudience
+): SubscriberStatus[] {
+  if (audience.audience_tag === null) {
+    return ["verified"];
+  }
+  if (audience.audience_scope === "all") {
+    return ["verified", "pending"];
+  }
+  if (audience.audience_scope === "pending") {
+    return ["pending"];
+  }
+  return ["verified"];
+}
+
+export function describeAudience(audience: BroadcastAudience): string {
+  if (audience.audience_tag === null) {
+    return "all verified subscribers";
+  }
+  const scopeLabel =
+    audience.audience_scope === "all"
+      ? "confirmed + unconfirmed"
+      : audience.audience_scope === "pending"
+        ? "unconfirmed only"
+        : "confirmed only";
+  return `subscribers tagged "${audience.audience_tag}" (${scopeLabel})`;
 }
 
 const INVISIBLE_CHAR_NAMES = new Map<number, string>([
@@ -129,25 +184,99 @@ export function getContentWarnings(content: string): string[] {
 }
 
 /**
- * Editing the subject, content, or sender of a tested draft invalidates the
- * test approval - what was tested is no longer what would be sent.
+ * Warn when the confirm placeholder and the audience disagree. A broadcast
+ * reaching unconfirmed subscribers without a confirm link gives them no way
+ * onto the list; a confirm link sent to confirmed-only audiences is dead
+ * weight; and any other {{...}} pattern ships as literal text (including a
+ * placeholder corrupted by an invisible character, which no longer matches
+ * exactly).
+ */
+export function findAudienceWarnings(
+  broadcast: Pick<Broadcast, "content" | "audience_tag" | "audience_scope">
+): string[] {
+  const warnings: string[] = [];
+
+  const placeholderPattern = /\{\{[^{}]*\}\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = placeholderPattern.exec(broadcast.content)) !== null) {
+    if (match[0] !== CONFIRM_URL_PLACEHOLDER) {
+      const line = broadcast.content.slice(0, match.index).split("\n").length;
+      warnings.push(
+        `Line ${String(line)}: unrecognized placeholder ${match[0]} - it will appear as literal text (only ${CONFIRM_URL_PLACEHOLDER} is substituted)`
+      );
+    }
+  }
+
+  const hasConfirmLink = broadcast.content.includes(CONFIRM_URL_PLACEHOLDER);
+  const reachesPending =
+    broadcastAudienceStatuses(broadcast).includes("pending");
+  if (reachesPending && !hasConfirmLink) {
+    warnings.push(
+      `This audience includes unconfirmed subscribers but the content has no ${CONFIRM_URL_PLACEHOLDER} confirm link - they would have no way to confirm`
+    );
+  }
+  if (!reachesPending && hasConfirmLink) {
+    warnings.push(
+      `The content has a ${CONFIRM_URL_PLACEHOLDER} confirm link but everyone in this audience is already confirmed`
+    );
+  }
+  return warnings;
+}
+
+export function getBroadcastWarnings(
+  broadcast: Pick<
+    Broadcast,
+    "subject" | "content" | "audience_tag" | "audience_scope"
+  >
+): string[] {
+  const warnings = [
+    ...getContentWarnings(broadcast.content),
+    ...findAudienceWarnings(broadcast),
+  ];
+  if (broadcast.subject.includes("{{")) {
+    warnings.push(
+      "The subject line contains {{ - placeholders are only substituted in the content, so it would be sent as literal text"
+    );
+  }
+  return warnings;
+}
+
+/**
+ * Editing the subject, content, sender, or audience of a tested draft
+ * invalidates the test approval - what was tested is no longer what would be
+ * sent. The audience counts: switching from confirmed-only to a tag that
+ * includes unconfirmed subscribers changes the send as materially as the
+ * words do.
  */
 export function editClearsTestApproval({
   broadcast,
   updates,
 }: {
-  broadcast: Pick<Broadcast, "subject" | "content" | "sender_identity_id">;
+  broadcast: Pick<
+    Broadcast,
+    | "subject"
+    | "content"
+    | "sender_identity_id"
+    | "audience_tag"
+    | "audience_scope"
+  >;
   updates: {
     subject?: string;
     content?: string;
     senderIdentityId?: string;
+    audienceTag?: string | null;
+    audienceScope?: BroadcastAudienceScope;
   };
 }): boolean {
   return (
     (updates.subject !== undefined && updates.subject !== broadcast.subject) ||
     (updates.content !== undefined && updates.content !== broadcast.content) ||
     (updates.senderIdentityId !== undefined &&
-      updates.senderIdentityId !== broadcast.sender_identity_id)
+      updates.senderIdentityId !== broadcast.sender_identity_id) ||
+    (updates.audienceTag !== undefined &&
+      updates.audienceTag !== broadcast.audience_tag) ||
+    (updates.audienceScope !== undefined &&
+      updates.audienceScope !== broadcast.audience_scope)
   );
 }
 
@@ -296,17 +425,26 @@ export async function createBroadcast({
   subject,
   content,
   senderIdentityId,
+  audienceTag,
+  audienceScope,
 }: {
   subject: string;
   content: string;
   senderIdentityId: string;
+  audienceTag?: string | null;
+  audienceScope?: BroadcastAudienceScope;
 }): Promise<Broadcast> {
+  const tag = audienceTag ?? null;
   return db
     .insertInto("broadcasts")
     .values({
       subject,
       content,
       sender_identity_id: senderIdentityId,
+      audience_tag: tag,
+      // Scope is meaningless without a tag; normalizing here keeps every
+      // untagged broadcast in the default all-verified shape
+      audience_scope: tag === null ? "verified" : (audienceScope ?? "verified"),
     })
     .returningAll()
     .executeTakeFirstOrThrow();
@@ -317,11 +455,15 @@ export async function updateBroadcastDraft({
   subject,
   content,
   senderIdentityId,
+  audienceTag,
+  audienceScope,
 }: {
   id: string;
   subject?: string;
   content?: string;
   senderIdentityId?: string;
+  audienceTag?: string | null;
+  audienceScope?: BroadcastAudienceScope;
 }): Promise<Broadcast | undefined> {
   const existing = await getBroadcastById(id);
   if (existing?.status !== "draft") {
@@ -332,6 +474,8 @@ export async function updateBroadcastDraft({
     subject: string;
     content: string;
     sender_identity_id: string;
+    audience_tag: string | null;
+    audience_scope: BroadcastAudienceScope;
     test_sent_to: string | null;
     test_sent_at: Date | null;
   }> = {};
@@ -340,6 +484,19 @@ export async function updateBroadcastDraft({
   if (senderIdentityId !== undefined) {
     updates.sender_identity_id = senderIdentityId;
   }
+  if (audienceTag !== undefined) updates.audience_tag = audienceTag;
+  // Clearing the tag always resets the scope - an untagged broadcast is
+  // all-verified by definition. Normalized before the approval check so a
+  // scope "change" that normalization discards cannot clear test approval.
+  let normalizedScope = audienceScope;
+  if (audienceTag !== undefined || audienceScope !== undefined) {
+    const finalTag =
+      audienceTag !== undefined ? audienceTag : existing.audience_tag;
+    if (finalTag === null) {
+      normalizedScope = "verified";
+    }
+  }
+  if (normalizedScope !== undefined) updates.audience_scope = normalizedScope;
 
   if (Object.keys(updates).length === 0) {
     return existing;
@@ -348,7 +505,13 @@ export async function updateBroadcastDraft({
   if (
     editClearsTestApproval({
       broadcast: existing,
-      updates: { subject, content, senderIdentityId },
+      updates: {
+        subject,
+        content,
+        senderIdentityId,
+        audienceTag,
+        audienceScope: normalizedScope,
+      },
     })
   ) {
     updates.test_sent_to = null;
@@ -385,6 +548,8 @@ export async function duplicateBroadcast(
     subject: existing.subject,
     content: existing.content,
     senderIdentityId: existing.sender_identity_id,
+    audienceTag: existing.audience_tag,
+    audienceScope: existing.audience_scope,
   });
 }
 
@@ -461,27 +626,38 @@ export async function stampBroadcastSender({
 }
 
 /**
- * Snapshot the current verified audience as pending recipient rows. Called
+ * Snapshot the broadcast's current audience as pending recipient rows. Called
  * only on the first claim of a broadcast - the audience is frozen at first
  * send. The ON CONFLICT guard additionally keeps existing rows untouched, so
  * recipients already marked sent can never be emailed again.
  */
 export async function snapshotBroadcastRecipients(
-  broadcastId: string
+  broadcast: Pick<Broadcast, "id" | "audience_tag" | "audience_scope">
 ): Promise<void> {
+  const statuses = broadcastAudienceStatuses(broadcast);
+  const tag = broadcast.audience_tag;
   await db
     .insertInto("broadcast_recipients")
     .columns(["broadcast_id", "subscriber_id", "email"])
-    .expression((eb) =>
-      eb
+    .expression((eb) => {
+      let query = eb
         .selectFrom("subscribers")
         .select((seb) => [
-          seb.val(broadcastId).as("broadcast_id"),
+          seb.val(broadcast.id).as("broadcast_id"),
           "subscribers.id as subscriber_id",
           "subscribers.email as email",
         ])
-        .where("status", "=", "verified")
-    )
+        .where("status", "in", statuses);
+      if (tag !== null) {
+        query = query.where("subscribers.id", "in", (seb) =>
+          seb
+            .selectFrom("subscriber_tags")
+            .select("subscriber_tags.subscriber_id")
+            .where("subscriber_tags.tag", "=", tag)
+        );
+      }
+      return query;
+    })
     .onConflict((oc) =>
       oc.columns(["broadcast_id", "subscriber_id"]).doNothing()
     )
@@ -663,5 +839,27 @@ export async function countVerifiedSubscribers(): Promise<number> {
     .select(sql<number>`count(*)::int`.as("count"))
     .where("status", "=", "verified")
     .executeTakeFirstOrThrow();
+  return row.count;
+}
+
+/** Live size of a broadcast's audience; must match the snapshot's filters. */
+export async function countAudienceSubscribers(
+  audience: Pick<Broadcast, "audience_tag" | "audience_scope">
+): Promise<number> {
+  const statuses = broadcastAudienceStatuses(audience);
+  const tag = audience.audience_tag;
+  let query = db
+    .selectFrom("subscribers")
+    .select(sql<number>`count(*)::int`.as("count"))
+    .where("status", "in", statuses);
+  if (tag !== null) {
+    query = query.where("subscribers.id", "in", (seb) =>
+      seb
+        .selectFrom("subscriber_tags")
+        .select("subscriber_tags.subscriber_id")
+        .where("subscriber_tags.tag", "=", tag)
+    );
+  }
+  const row = await query.executeTakeFirstOrThrow();
   return row.count;
 }
