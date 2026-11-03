@@ -460,10 +460,7 @@ export async function sendTestEmail(
   email: string,
   asOfDate?: Date
 ): Promise<void> {
-  const events = await getReportableEvents(
-    env.LUMA_CALENDAR_ID,
-    asOfDate ?? new Date()
-  );
+  const events = await getReportableEvents(asOfDate ?? new Date());
   const { from, subject, html } = getBasicEmailContent(events, true);
 
   await sendViaSes({ to: email, subject, html, from });

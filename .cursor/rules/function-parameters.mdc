@@ -53,5 +53,5 @@ await sendDiscordInfo({
 ```typescript
 // ✅ OK - few params, obvious from name
 function formatEventDate(dateString: string): string {}
-function getReportableEvents(calendarId: string, asOfDate?: Date): Promise<LumaEvent[]> {}
+function getReportableEvents(asOfDate?: Date): Promise<LumaEvent[]> {}
 ```

@@ -19,7 +19,7 @@ async function main(): Promise<void> {
       await import("../src/lib/luma");
 
     console.log("Fetching events from Luma...");
-    const events = await getReportableEvents(env.LUMA_CALENDAR_ID);
+    const events = await getReportableEvents();
 
     console.log(
       `Found ${String(events.length)} event(s) for the upcoming week`

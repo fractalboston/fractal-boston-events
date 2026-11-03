@@ -56,7 +56,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     try {
-      const events = await getReportableEvents(env.LUMA_CALENDAR_ID);
+      const events = await getReportableEvents();
       await sendWelcomeEmail(
         subscriber.email,
         subscriber.token,

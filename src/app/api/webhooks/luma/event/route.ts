@@ -54,10 +54,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const event = convertWebhookEventToLumaEvent(webhookEvent);
 
-    const timePart =
-      event.start_at != null && event.start_at !== ""
-        ? ` (${event.start_at})`
-        : "";
+    const timePart = event.start_at !== "" ? ` (${event.start_at})` : "";
     await sendDiscordInfo({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
       message: `"${event.event.name}"${timePart}`,
