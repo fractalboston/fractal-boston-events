@@ -16,7 +16,7 @@ export async function GET(): Promise<Response> {
   }
 
   try {
-    const events = await getReportableEvents(env.LUMA_CALENDAR_ID);
+    const events = await getReportableEvents();
 
     await sendDiscordWeeklySummary(
       env.DISCORD_EVENTS_WEBHOOK_URL,

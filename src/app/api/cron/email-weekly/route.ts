@@ -20,9 +20,9 @@ export async function GET(): Promise<Response> {
   }
 
   try {
-    const { LUMA_CALENDAR_ID, DISCORD_LOGGING_WEBHOOK_URL, APP_URL } = env;
+    const { DISCORD_LOGGING_WEBHOOK_URL, APP_URL } = env;
 
-    const events = await getReportableEvents(LUMA_CALENDAR_ID);
+    const events = await getReportableEvents();
     console.log(`Found ${String(events.length)} events`);
 
     const verifiedSubscribers = await getAllVerifiedSubscribers();

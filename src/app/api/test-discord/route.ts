@@ -50,7 +50,7 @@ export async function POST(request: Request): Promise<Response> {
     const asOfDate =
       asOfDateStr !== undefined ? parseAsOfDate(asOfDateStr) : undefined;
 
-    const events = await getReportableEvents(env.LUMA_CALENDAR_ID, asOfDate);
+    const events = await getReportableEvents(asOfDate);
 
     await sendDiscordWeeklySummary(
       env.DISCORD_LOGGING_WEBHOOK_URL,

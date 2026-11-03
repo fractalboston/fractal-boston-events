@@ -4,7 +4,6 @@ import {
   getBasicEmailContent,
   getDetailedEmailContent,
 } from "@/lib/email";
-import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 import { isSessionUser, requireSession } from "@/lib/passkey/requireSession";
 
@@ -32,7 +31,7 @@ export async function GET(request: Request): Promise<Response> {
     const dateParam = searchParams.get("date");
     const asOfDate = parseAsOfDate(dateParam) ?? new Date();
 
-    const events = await getReportableEvents(env.LUMA_CALENDAR_ID, asOfDate);
+    const events = await getReportableEvents(asOfDate);
     const simpleContent: EmailContent = getBasicEmailContent(events, true);
     const detailedContent: EmailContent = getDetailedEmailContent(events, true);
 

@@ -1,27 +1,139 @@
 import { z } from "zod";
 import { env } from "@/lib/env";
 
-async function fetchEventsPage(
-  calendarId: string,
-  limit: number,
-  cursor: string | null = null
-): Promise<{ events: LumaEvent[]; nextCursor: string | null }> {
+/** Minimal event shape used by emails, Discord, and previews. */
+export type LumaEvent = {
+  api_id: string;
+  start_at: string;
+  event: {
+    name: string;
+    url: string;
+    cover_url: string;
+    start_at: string;
+  };
+};
+
+const eventVisibilitySchema = z.enum(["public", "members-only", "private"]);
+
+const publicEventSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  url: z.string(),
+  start_at: z.string(),
+  cover_url: z.string().optional(),
+  // Present on Luma-managed/listed events; absent on external listings.
+  visibility: eventVisibilitySchema.optional(),
+  platform: z.string().optional(),
+});
+
+const eventListSchema = z.object({
+  entries: z.array(z.unknown()),
+  has_more: z.boolean(),
+  next_cursor: z.string().optional(),
+});
+
+export type PublicCalendarEvent = z.infer<typeof publicEventSchema>;
+export type EventListPage = z.infer<typeof eventListSchema>;
+
+/** External listings omit visibility; treat those as reportable. */
+export function isPubliclyReportableEvent(entry: PublicCalendarEvent): boolean {
+  return entry.visibility === undefined || entry.visibility === "public";
+}
+
+export function toLumaEvent(entry: PublicCalendarEvent): LumaEvent {
+  return {
+    api_id: entry.id,
+    start_at: entry.start_at,
+    event: {
+      name: entry.name,
+      url: entry.url,
+      cover_url: entry.cover_url ?? "",
+      start_at: entry.start_at,
+    },
+  };
+}
+
+/**
+ * Parses one calendar list entry into a reportable LumaEvent, or null if the
+ * entry is invalid / non-public.
+ */
+export function parseReportableCalendarEntry(entry: unknown): LumaEvent | null {
+  const eventParsed = publicEventSchema.safeParse(entry);
+  if (!eventParsed.success) {
+    return null;
+  }
+  // Authenticated API can return private managed events; don't leak those
+  // into public email/Discord/API report surfaces.
+  if (!isPubliclyReportableEvent(eventParsed.data)) {
+    return null;
+  }
+  return toLumaEvent(eventParsed.data);
+}
+
+/**
+ * Validates a list-events response page and extracts reportable events plus
+ * the cursor to request next (null when done).
+ */
+export function parseEventListPage(payload: unknown): {
+  events: LumaEvent[];
+  nextCursor: string | null;
+} {
+  const parsed = eventListSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new Error(`Response validation failed: ${parsed.error.message}`);
+  }
+
+  const events: LumaEvent[] = [];
+  for (const entry of parsed.data.entries) {
+    const reportable = parseReportableCalendarEntry(entry);
+    if (reportable !== null) {
+      events.push(reportable);
+    }
+  }
+
+  const nextCursor =
+    parsed.data.has_more && parsed.data.next_cursor !== undefined
+      ? parsed.data.next_cursor
+      : null;
+
+  return { events, nextCursor };
+}
+
+async function fetchEventsPage({
+  after,
+  before,
+  cursor,
+  limit,
+}: {
+  after: string;
+  before: string;
+  cursor: string | null;
+  limit: number;
+}): Promise<{ events: LumaEvent[]; nextCursor: string | null }> {
   const params = new URLSearchParams({
-    calendar_api_id: calendarId,
+    after,
+    before,
     pagination_limit: String(limit),
-    period: "future",
+    sort_column: "start_at",
+    sort_direction: "asc",
   });
 
+  // Include managed, listed (view), and external calendar events.
+  params.append("access", "manage");
+  params.append("access", "view");
+  params.append("platforms", "luma");
+  params.append("platforms", "external");
+
   if (cursor !== null) {
-    params.append("pagination_cursor", cursor);
+    params.set("pagination_cursor", cursor);
   }
 
   const response = await fetch(
-    `https://api2.luma.com/calendar/get-items?${params}`,
+    `https://public-api.luma.com/v1/calendars/events/list?${params}`,
     {
       headers: {
         accept: "application/json",
-        // "x-luma-api-key": apiKey,
+        "x-luma-api-key": env.LUMA_API_KEY,
       },
     }
   );
@@ -31,125 +143,50 @@ async function fetchEventsPage(
     throw new Error(`Luma API error: ${String(response.status)} - ${text}`);
   }
 
-  const parsed = eventListSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    throw new Error(`Response validation failed: ${parsed.error.message}`);
-  }
-
-  const rawEventCandidates: unknown[] = [];
-  for (const entry of parsed.data.entries) {
-    if (entry === null || typeof entry !== "object") {
-      continue;
-    }
-    const maybeEvent = (entry as { event?: unknown }).event;
-    if (maybeEvent === null || typeof maybeEvent !== "object") {
-      continue;
-    }
-    const eventObj = maybeEvent as { name?: unknown; start_at?: unknown };
-    if (
-      typeof eventObj.name === "string" &&
-      typeof eventObj.start_at === "string"
-    ) {
-      rawEventCandidates.push(entry);
-    }
-  }
-  const expectedEventCount = rawEventCandidates.length;
-
-  const events: LumaEvent[] = [];
-  for (const entry of parsed.data.entries) {
-    const validated = eventSchema.safeParse(entry);
-    if (validated.success) {
-      events.push(validated.data);
-    } else {
-      const externalParsed = externalEventEntrySchema.safeParse(entry);
-      if (externalParsed.success) {
-        const converted = convertExternalEntryToLumaEvent(externalParsed.data);
-        events.push(converted);
-      }
-    }
-  }
-
-  const parsedEventCount = events.length;
-  if (parsedEventCount !== expectedEventCount) {
-    await notifyLumaEventParsingDiscrepancy({
-      rawEntries: rawEventCandidates,
-      parsedEvents: events,
-    });
-  }
-
-  // Determine next cursor: use pagination_cursor if available, otherwise use last entry's api_id if has_more
-  let nextCursor: string | null = null;
-  if (parsed.data.has_more) {
-    nextCursor =
-      parsed.data.pagination_cursor ??
-      (events.length > 0 ? (events[events.length - 1]?.api_id ?? null) : null);
-  }
-
-  return {
-    events,
-    nextCursor,
-  };
+  return parseEventListPage(await response.json());
 }
 
-export async function fetchUpcomingEvents(
-  calendarId: string,
+/**
+ * Gets the set of events that should be reported via email or Discord.
+ * Returns events within the next 7 days from the given date (or from now if omitted).
+ *
+ * Uses the official Luma public API (calendar-scoped API key).
+ */
+export async function getReportableEvents(
   asOfDate?: Date
 ): Promise<LumaEvent[]> {
   const windowStart = asOfDate ?? new Date();
   const windowEnd = new Date(windowStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const after = windowStart.toISOString();
+  const before = windowEnd.toISOString();
 
   const allEvents: LumaEvent[] = [];
   const seenEventIds = new Set<string>();
 
-  const addEvents = (events: LumaEvent[]): void => {
-    for (const event of events) {
-      if (!seenEventIds.has(event.api_id)) {
-        const startAt = getEventStartAt(event);
-        const eventStart = new Date(startAt);
-        if (
-          !Number.isNaN(eventStart.getTime()) &&
-          eventStart >= windowStart &&
-          eventStart <= windowEnd
-        ) {
-          seenEventIds.add(event.api_id);
-          allEvents.push(event);
-        }
-      }
-    }
-  };
-
-  // Fetch all pages of events using the new api2.luma.com endpoint
-  // This endpoint returns both managed events and events listed on the calendar
   const paginationLimit = 50;
   let cursor: string | null = null;
   let hasMore = true;
 
   while (hasMore) {
-    const result = await fetchEventsPage(calendarId, paginationLimit, cursor);
-    addEvents(result.events);
+    const result = await fetchEventsPage({
+      after,
+      before,
+      cursor,
+      limit: paginationLimit,
+    });
+
+    for (const event of result.events) {
+      if (!seenEventIds.has(event.api_id)) {
+        seenEventIds.add(event.api_id);
+        allEvents.push(event);
+      }
+    }
+
     cursor = result.nextCursor;
     hasMore = cursor !== null;
   }
 
   return allEvents;
-}
-
-/**
- * Gets the set of events that should be reported via email or Discord.
- * This is the single source of truth for determining which events to notify about.
- * Returns events within the next 7 days from the given date (or from now if omitted).
- *
- * IMPORTANT: Both Discord weekly summaries and email weekly digests use this function
- * to ensure they show the same events. The weekly cron job calls this once and passes
- * the same events array to both Discord and email functions.
- *
- * @param asOfDate - When provided, the 7-day window is calculated from this date (e.g. for previewing "as if email went out on this date").
- */
-export async function getReportableEvents(
-  calendarId: string,
-  asOfDate?: Date
-): Promise<LumaEvent[]> {
-  return fetchUpcomingEvents(calendarId, asOfDate);
 }
 
 export function parseLumaSubscriberWebhook(
@@ -180,456 +217,9 @@ export function isEventWithinNextWeek(event: { start_at: string }): boolean {
   return eventStart >= now && eventStart <= nextWeek;
 }
 
-async function notifyLumaEventParsingDiscrepancy({
-  rawEntries,
-  parsedEvents,
-}: {
-  rawEntries: unknown[];
-  parsedEvents: LumaEvent[];
-}): Promise<void> {
-  try {
-    const parsedIds = new Set(parsedEvents.map((event) => event.api_id));
-
-    const droppedEvents: {
-      apiId: string;
-      name: string;
-      startAt: string | null;
-      timezone?: string;
-    }[] = [];
-
-    for (const entry of rawEntries) {
-      if (entry === null || typeof entry !== "object") {
-        continue;
-      }
-
-      const typedEntry = entry as {
-        api_id?: unknown;
-        event?: { name?: unknown; start_at?: unknown; timezone?: unknown };
-      };
-
-      const apiId =
-        typeof typedEntry.api_id === "string" ? typedEntry.api_id : null;
-      if (apiId === null || parsedIds.has(apiId)) {
-        continue;
-      }
-
-      const event = typedEntry.event;
-      if (typeof event !== "object") {
-        continue;
-      }
-
-      const name = typeof event.name === "string" ? event.name : null;
-      const startAt =
-        typeof event.start_at === "string" ? event.start_at : null;
-      const timezone =
-        typeof event.timezone === "string" ? event.timezone : undefined;
-
-      if (name !== null) {
-        droppedEvents.push({
-          apiId,
-          name,
-          startAt,
-          timezone,
-        });
-      }
-    }
-
-    const contentLines: string[] = [];
-    contentLines.push("⚠️ **Luma event parsing discrepancy detected**");
-    contentLines.push(
-      `Expected ${String(rawEntries.length)} event-like entries from Luma, but only ${String(parsedEvents.length)} were parsed successfully.`
-    );
-
-    if (droppedEvents.length > 0) {
-      contentLines.push("");
-      contentLines.push("Dropped events (failed Zod parsing):");
-      for (const dropped of droppedEvents.slice(0, 10)) {
-        const when = dropped.startAt !== null ? ` at ${dropped.startAt}` : "";
-        const tz =
-          dropped.timezone !== undefined ? ` (${dropped.timezone})` : "";
-        contentLines.push(`• ${dropped.name}${when}${tz} [${dropped.apiId}]`);
-      }
-      if (droppedEvents.length > 10) {
-        contentLines.push(`…and ${String(droppedEvents.length - 10)} more.`);
-      }
-    }
-
-    await postDiscordLoggingMessage({ content: contentLines.join("\n") });
-  } catch (error) {
-    console.error(
-      "Failed to compute or send Luma event parsing discrepancy:",
-      error
-    );
-  }
-}
-
-async function postDiscordLoggingMessage({
-  content,
-}: {
-  content: string;
-}): Promise<void> {
-  try {
-    const response = await fetch(env.DISCORD_LOGGING_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content,
-        embeds: [],
-        // Suppress embeds so we don't get noisy link previews
-        flags: 1 << 2,
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(
-        `Luma Discord logging webhook error: ${String(response.status)} - ${text}`
-      );
-    }
-  } catch (error) {
-    console.error("Failed to send message to Discord logging webhook:", error);
-  }
-}
-
-// Zod schemas for the api2.luma.com/calendar/get-items response
-const coordinateSchema = z.object({
-  longitude: z.number(),
-  latitude: z.number(),
-});
-
-const coordinate2Schema = z.object({
-  longitude: z.number(),
-  latitude: z.number(),
-});
-
-const virtualInfoSchema = z.object({
-  has_access: z.boolean(),
-});
-
-const geoAddressInfoSchema = z.object({
-  city: z.string().optional(),
-  type: z.string().optional(),
-  region: z.string().optional(),
-  address: z.string().optional(),
-  country: z.string().optional(),
-  place_id: z.string().optional(),
-  localized: z.unknown().optional(),
-  city_state: z.string().optional(),
-  description: z.string().optional(),
-  sublocality: z.string().nullish(),
-  country_code: z.string().optional(),
-  full_address: z.string().optional(),
-  short_address: z.string().optional(),
-  apple_maps_place_id: z.string().nullish(),
-  mode: z.string(),
-});
-
-const neutralSchema = z.object({
-  color: z.string(),
-  percentage: z.number(),
-});
-
-const vibrantSchema = z.object({
-  color: z.string(),
-  percentage: z.number(),
-});
-
-const paletteSchema = z.object({
-  neutral: z.array(neutralSchema),
-  vibrant: z.array(vibrantSchema),
-});
-
-const coverImageSchema = z.object({
-  vibrant_color: z.unknown().nullish(),
-  colors: z.array(z.string()),
-  palette: paletteSchema.nullable(),
-});
-
-const personalUserSchema = z.object({
-  api_id: z.string(),
-  avatar_url: z.string(),
-  bio_short: z.string().nullable(),
-  instagram_handle: z.unknown(),
-  is_verified: z.boolean(),
-  last_online_at: z.string(),
-  linkedin_handle: z.string().nullable(),
-  name: z.string(),
-  tiktok_handle: z.unknown(),
-  timezone: z.string(),
-  twitter_handle: z.string().nullable(),
-  username: z.string().nullable(),
-  website: z.unknown(),
-  youtube_handle: z.string().nullable(),
-});
-
-const calendarSchema = z.object({
-  access_level: z.string(),
-  api_id: z.string(),
-  avatar_url: z.string(),
-  coordinate: coordinate2Schema.nullable(),
-  cover_image_url: z.string(),
-  description_short: z.string().nullable(),
-  event_submission_restriction: z.string(),
-  geo_city: z.string().nullable(),
-  geo_country: z.string().nullable(),
-  geo_region: z.string().nullable(),
-  google_measurement_id: z.unknown(),
-  instagram_handle: z.unknown(),
-  is_blocked: z.boolean(),
-  launch_status: z.string(),
-  linkedin_handle: z.unknown(),
-  luma_plus_active: z.boolean(),
-  meta_pixel_id: z.unknown(),
-  name: z.string(),
-  personal_user_api_id: z.string().nullable(),
-  refund_policy: z.unknown(),
-  slug: z.string().nullable(),
-  social_image_url: z.unknown(),
-  stripe_account_id: z.unknown(),
-  tax_config: z.unknown(),
-  tiktok_handle: z.unknown(),
-  timezone: z.string().nullable(),
-  tint_color: z.string(),
-  track_meta_ads_from_luma: z.boolean(),
-  twitter_handle: z.unknown(),
-  verified_at: z.string().nullable(),
-  website: z.string().nullable(),
-  youtube_handle: z.unknown(),
-  is_personal: z.boolean(),
-  personal_user: personalUserSchema.nullable(),
-});
-
-const hostSchema = z.object({
-  name: z.string(),
-  api_id: z.string(),
-  website: z.unknown(),
-  timezone: z.string(),
-  username: z.string().nullable(),
-  bio_short: z.string().nullable(),
-  avatar_url: z.string(),
-  is_verified: z.boolean(),
-  tiktok_handle: z.unknown(),
-  last_online_at: z.string(),
-  twitter_handle: z.string().nullable(),
-  youtube_handle: z.string().nullable(),
-  linkedin_handle: z.string().nullable(),
-  instagram_handle: z.unknown(),
-});
-
-const featuredGuestSchema = z.object({
-  api_id: z.string(),
-  avatar_url: z.string(),
-  bio_short: z.string().nullable(),
-  instagram_handle: z.string().nullable(),
-  is_verified: z.boolean(),
-  last_online_at: z.string().nullish(),
-  linkedin_handle: z.string().nullable(),
-  name: z.string(),
-  tiktok_handle: z.unknown(),
-  timezone: z.string(),
-  twitter_handle: z.unknown(),
-  username: z.string().nullable(),
-  website: z.unknown(),
-  youtube_handle: z.string().nullable(),
-});
-
-const ticketInfoSchema = z.object({
-  price: z.unknown(),
-  is_free: z.boolean(),
-  max_price: z.unknown(),
-  is_sold_out: z.boolean(),
-  spots_remaining: z.number().nullable(),
-  is_near_capacity: z.boolean(),
-  require_approval: z.boolean(),
-  currency_info: z.unknown().nullish(),
-});
-
-const eventDetailSchema = z.object({
-  api_id: z.string(),
-  calendar_api_id: z.string(),
-  cover_url: z.string(),
-  end_at: z.string(),
-  event_type: z.string(),
-  hide_rsvp: z.boolean(),
-  location_type: z.string(),
-  name: z.string(),
-  one_to_one: z.boolean(),
-  recurrence_id: z.unknown(),
-  show_guest_list: z.boolean(),
-  start_at: z.string(),
-  timezone: z.string(),
-  url: z.string(),
-  user_api_id: z.string(),
-  visibility: z.string(),
-  virtual_info: virtualInfoSchema,
-  geo_address_info: geoAddressInfoSchema.nullable(),
-  geo_address_visibility: z.string(),
-  coordinate: coordinateSchema.nullable(),
-  waitlist_enabled: z.boolean(),
-  waitlist_status: z.string(),
-});
-
-const eventSchema = z.object({
-  api_id: z.string(),
-  event: eventDetailSchema,
-  cover_image: coverImageSchema,
-  calendar: calendarSchema,
-  start_at: z.string().nullable(),
-  hosts: z.array(hostSchema),
-  guest_count: z.number(),
-  ticket_count: z.number(),
-  ticket_info: ticketInfoSchema,
-  featured_guests: z.array(featuredGuestSchema),
-  role: z.unknown(),
-  waitlist_active: z.boolean(),
-  featured_city: z.unknown(),
-  calendar_api_id: z.string(),
-  is_manager: z.boolean(),
-  platform: z.string(),
-  status: z.string(),
-  submitted_by_user_api_id: z.string(),
-  tags: z.array(z.unknown()),
-});
-
-// Schema for entries that might not have the event property (e.g., other calendar item types)
-const calendarItemSchema = z.unknown();
-
-const eventListSchema = z.object({
-  entries: z.array(z.union([eventSchema, calendarItemSchema])),
-  has_more: z.boolean(),
-  pagination_cursor: z.string().nullable().optional(),
-});
-
-/** External/listed events on the calendar have a different shape (no top-level start_at, minimal event object). */
-const externalEventDetailSchema = z.object({
-  name: z.string(),
-  start_at: z.string(),
-  timezone: z.string(),
-  url: z.string(),
-  cover_url: z.string().optional(),
-  geo_address_info: geoAddressInfoSchema,
-  coordinate: coordinateSchema.nullable(),
-  duration_interval: z.string().optional(),
-  geo_address_json: z.unknown().optional(),
-  host: z.unknown().nullable().optional(),
-});
-
-const externalEventEntrySchema = z.object({
-  api_id: z.string(),
-  calendar_api_id: z.string(),
-  platform: z.string(),
-  status: z.string(),
-  submitted_by_user_api_id: z.string(),
-  tags: z.array(z.unknown()),
-  is_manager: z.boolean(),
-  event: externalEventDetailSchema,
-  cover_image: coverImageSchema.optional(),
-  cover_image_url: z.string().optional(),
-});
-
-type ExternalEventEntry = z.infer<typeof externalEventEntrySchema>;
-
-export type LumaEvent = z.infer<typeof eventSchema>;
-
-/** Use top-level start_at when set; otherwise fall back to event.start_at (API sometimes returns null at top level). */
+/** Prefer top-level start_at; fall back to nested event.start_at. */
 export function getEventStartAt(event: LumaEvent): string {
-  return event.start_at ?? event.event.start_at;
-}
-
-function convertExternalEntryToLumaEvent(entry: ExternalEventEntry): LumaEvent {
-  const e = entry.event;
-  return {
-    api_id: entry.api_id,
-    event: {
-      api_id: entry.api_id,
-      calendar_api_id: entry.calendar_api_id,
-      cover_url: e.cover_url ?? entry.cover_image_url ?? "",
-      end_at: e.start_at,
-      event_type: "external",
-      hide_rsvp: false,
-      location_type: "offline",
-      name: e.name,
-      one_to_one: false,
-      recurrence_id: null,
-      show_guest_list: false,
-      start_at: e.start_at,
-      timezone: e.timezone,
-      url: e.url,
-      user_api_id: entry.submitted_by_user_api_id,
-      visibility: "public",
-      virtual_info: { has_access: false },
-      geo_address_info: e.geo_address_info,
-      geo_address_visibility: "public",
-      coordinate: e.coordinate,
-      waitlist_enabled: false,
-      waitlist_status: "disabled",
-    },
-    cover_image: {
-      vibrant_color: null,
-      colors: [],
-      palette: null,
-    },
-    calendar: {
-      access_level: "public",
-      api_id: "",
-      avatar_url: "",
-      coordinate: null,
-      cover_image_url: "",
-      description_short: null,
-      event_submission_restriction: "anyone",
-      geo_city: null,
-      geo_country: null,
-      geo_region: null,
-      google_measurement_id: null,
-      instagram_handle: null,
-      is_blocked: false,
-      launch_status: "launched",
-      linkedin_handle: null,
-      luma_plus_active: false,
-      meta_pixel_id: null,
-      name: "Fractal Boston",
-      personal_user_api_id: null,
-      refund_policy: null,
-      slug: null,
-      social_image_url: null,
-      stripe_account_id: null,
-      tax_config: null,
-      tiktok_handle: null,
-      timezone: null,
-      tint_color: "#000000",
-      track_meta_ads_from_luma: false,
-      twitter_handle: null,
-      verified_at: null,
-      website: null,
-      youtube_handle: null,
-      is_personal: false,
-      personal_user: null,
-    },
-    start_at: null,
-    hosts: [],
-    guest_count: 0,
-    ticket_count: 0,
-    ticket_info: {
-      price: null,
-      is_free: true,
-      max_price: null,
-      is_sold_out: false,
-      spots_remaining: null,
-      is_near_capacity: false,
-      require_approval: false,
-      currency_info: null,
-    },
-    featured_guests: [],
-    role: null,
-    waitlist_active: false,
-    featured_city: null,
-    calendar_api_id: entry.calendar_api_id,
-    is_manager: entry.is_manager,
-    platform: entry.platform,
-    status: entry.status,
-    submitted_by_user_api_id: entry.submitted_by_user_api_id,
-    tags: entry.tags,
-  };
+  return event.start_at !== "" ? event.start_at : event.event.start_at;
 }
 
 const webhookEventSchema = z.object({
@@ -679,114 +269,12 @@ export function convertWebhookEventToLumaEvent(
 ): LumaEvent {
   return {
     api_id: webhookEvent.api_id,
-    event: {
-      api_id: webhookEvent.api_id,
-      calendar_api_id: "",
-      cover_url: webhookEvent.cover_url ?? "",
-      end_at: webhookEvent.end_at,
-      event_type: "event",
-      hide_rsvp: false,
-      location_type:
-        webhookEvent.geo_address_json !== null ? "physical" : "virtual",
-      name: webhookEvent.name,
-      one_to_one: false,
-      recurrence_id: null,
-      show_guest_list: true,
-      start_at: webhookEvent.start_at,
-      timezone: "America/New_York",
-      url: webhookEvent.url,
-      user_api_id: "",
-      visibility: "public",
-      virtual_info: {
-        has_access: false,
-      },
-      geo_address_info: webhookEvent.geo_address_json
-        ? {
-            city: webhookEvent.geo_address_json.city ?? "",
-            type: "point_of_interest",
-            mode: "manual",
-            city_state: webhookEvent.geo_address_json.city ?? "",
-            localized: null,
-          }
-        : {
-            city: "",
-            type: "point_of_interest",
-            mode: "manual",
-            city_state: "",
-            localized: null,
-          },
-      geo_address_visibility: "public",
-      coordinate: {
-        longitude: 0,
-        latitude: 0,
-      },
-      waitlist_enabled: false,
-      waitlist_status: "none",
-    },
-    cover_image: {
-      vibrant_color: null,
-      colors: [],
-      palette: null,
-    },
-    calendar: {
-      access_level: "public",
-      api_id: "",
-      avatar_url: "",
-      coordinate: null,
-      cover_image_url: "",
-      description_short: null,
-      event_submission_restriction: "anyone",
-      geo_city: null,
-      geo_country: null,
-      geo_region: null,
-      google_measurement_id: null,
-      instagram_handle: null,
-      is_blocked: false,
-      launch_status: "launched",
-      linkedin_handle: null,
-      luma_plus_active: false,
-      meta_pixel_id: null,
-      name: "Fractal Boston",
-      personal_user_api_id: null,
-      refund_policy: null,
-      slug: null,
-      social_image_url: null,
-      stripe_account_id: null,
-      tax_config: null,
-      tiktok_handle: null,
-      timezone: null,
-      tint_color: "#000000",
-      track_meta_ads_from_luma: false,
-      twitter_handle: null,
-      verified_at: null,
-      website: null,
-      youtube_handle: null,
-      is_personal: false,
-      personal_user: null,
-    },
     start_at: webhookEvent.start_at,
-    hosts: [],
-    guest_count: 0,
-    ticket_count: 0,
-    ticket_info: {
-      price: null,
-      is_free: true,
-      max_price: null,
-      is_sold_out: false,
-      spots_remaining: null,
-      is_near_capacity: false,
-      require_approval: false,
-      currency_info: null,
+    event: {
+      name: webhookEvent.name,
+      url: webhookEvent.url,
+      cover_url: webhookEvent.cover_url ?? "",
+      start_at: webhookEvent.start_at,
     },
-    featured_guests: [],
-    role: null,
-    waitlist_active: false,
-    featured_city: null,
-    calendar_api_id: "",
-    is_manager: false,
-    platform: "web",
-    status: "published",
-    submitted_by_user_api_id: "",
-    tags: [],
   };
 }

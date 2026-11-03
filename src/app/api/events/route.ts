@@ -1,5 +1,4 @@
 import { sendInternalError, sendSuccess } from "@/lib/api-response";
-import { env } from "@/lib/env";
 import { type LumaEvent, getReportableEvents } from "@/lib/luma";
 
 type EventsResponse = { events: LumaEvent[] };
@@ -24,7 +23,7 @@ export async function GET(request: Request): Promise<Response> {
     const dateParam = searchParams.get("date");
     const asOfDate = parseAsOfDate(dateParam) ?? new Date();
 
-    const events = await getReportableEvents(env.LUMA_CALENDAR_ID, asOfDate);
+    const events = await getReportableEvents(asOfDate);
     const data: EventsResponse = { events };
 
     return sendSuccess(data);
