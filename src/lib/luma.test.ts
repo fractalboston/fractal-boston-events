@@ -1,11 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { isEventWithinNextWeek } from "@/lib/luma";
+import { isEventWithinNextWeek, isPubliclyReportableEvent } from "@/lib/luma";
 
 function createMockEvent(startAt: Date): { start_at: string } {
   return {
     start_at: startAt.toISOString(),
   };
 }
+
+describe("isPubliclyReportableEvent", () => {
+  const base = {
+    id: "evt_1",
+    name: "Test",
+    url: "https://luma.com/test",
+    start_at: "2026-11-04T15:00:00.000Z",
+  };
+
+  it("allows public events", () => {
+    expect(isPubliclyReportableEvent({ ...base, visibility: "public" })).toBe(
+      true
+    );
+  });
+
+  it("allows external listings without visibility", () => {
+    expect(isPubliclyReportableEvent(base)).toBe(true);
+  });
+
+  it("excludes private and members-only events", () => {
+    expect(isPubliclyReportableEvent({ ...base, visibility: "private" })).toBe(
+      false
+    );
+    expect(
+      isPubliclyReportableEvent({ ...base, visibility: "members-only" })
+    ).toBe(false);
+  });
+});
 
 describe("isEventWithinNextWeek", () => {
   it("returns true for event tomorrow", () => {

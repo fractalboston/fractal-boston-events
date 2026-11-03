@@ -13,12 +13,16 @@ export type LumaEvent = {
   };
 };
 
+const eventVisibilitySchema = z.enum(["public", "members-only", "private"]);
+
 const publicEventSchema = z.object({
   id: z.string(),
   name: z.string(),
   url: z.string(),
   start_at: z.string(),
   cover_url: z.string().optional(),
+  // Present on Luma-managed/listed events; absent on external listings.
+  visibility: eventVisibilitySchema.optional(),
 });
 
 const eventListSchema = z.object({
@@ -26,6 +30,13 @@ const eventListSchema = z.object({
   has_more: z.boolean(),
   next_cursor: z.string().optional(),
 });
+
+/** External listings omit visibility; treat those as reportable. */
+export function isPubliclyReportableEvent(
+  entry: z.infer<typeof publicEventSchema>
+): boolean {
+  return entry.visibility === undefined || entry.visibility === "public";
+}
 
 function toLumaEvent(entry: z.infer<typeof publicEventSchema>): LumaEvent {
   return {
@@ -92,14 +103,19 @@ async function fetchEventsPage({
   const events: LumaEvent[] = [];
   for (const entry of parsed.data.entries) {
     const eventParsed = publicEventSchema.safeParse(entry);
-    if (eventParsed.success) {
-      events.push(toLumaEvent(eventParsed.data));
-    } else {
+    if (!eventParsed.success) {
       console.warn(
         "Skipping Luma calendar entry that failed validation:",
         eventParsed.error.message
       );
+      continue;
     }
+    // Authenticated API can return private managed events; don't leak those
+    // into public email/Discord/API report surfaces.
+    if (!isPubliclyReportableEvent(eventParsed.data)) {
+      continue;
+    }
+    events.push(toLumaEvent(eventParsed.data));
   }
 
   const nextCursor =
