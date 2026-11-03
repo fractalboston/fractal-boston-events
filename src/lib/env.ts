@@ -1,7 +1,6 @@
 import env from "env-var";
 
 export type Env = {
-  LUMA_CALENDAR_ID: string;
   LUMA_API_KEY: string;
   LUMA_WEBHOOK_SECRET: string;
   AWS_ACCESS_KEY_ID: string;
@@ -23,7 +22,6 @@ export type Env = {
 };
 
 const config: Env = {
-  LUMA_CALENDAR_ID: env.get("LUMA_CALENDAR_ID").required().asString(),
   LUMA_API_KEY: env.get("LUMA_API_KEY").required().asString(),
   LUMA_WEBHOOK_SECRET: env.get("LUMA_WEBHOOK_SECRET").required().asString(),
   AWS_ACCESS_KEY_ID: env.get("AWS_ACCESS_KEY_ID").required().asString(),

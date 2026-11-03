@@ -3,7 +3,6 @@
  * without requiring a real .env file.
  */
 const dummyUrl = "https://test.example.com";
-process.env.LUMA_CALENDAR_ID = process.env.LUMA_CALENDAR_ID ?? "test-calendar";
 process.env.LUMA_API_KEY = process.env.LUMA_API_KEY ?? "test-luma-api-key";
 process.env.LUMA_WEBHOOK_SECRET =
   process.env.LUMA_WEBHOOK_SECRET ?? "test-webhook-secret";
