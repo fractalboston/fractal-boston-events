@@ -66,12 +66,13 @@ export async function POST(
     // The dummy token keeps the confirm button clickable in a test send
     // without verifying anyone - it lands on the verify page's invalid-token
     // state
+    const unsubscribeUrl = joinAppUrl(env.APP_URL, "/unsubscribe?token=test");
     const html = buildBroadcastHtml({
       content: applyConfirmUrl({
         content: broadcast.content,
         confirmUrl: joinAppUrl(env.APP_URL, "/verify?token=test"),
       }),
-      unsubscribeUrl: joinAppUrl(env.APP_URL, "/unsubscribe?token=test"),
+      unsubscribeUrl,
     });
     const subject = formatTestSubject(broadcast.subject);
 
@@ -81,6 +82,7 @@ export async function POST(
       html,
       from: formatSenderFrom(identity),
       replyTo: identity.reply_to ?? undefined,
+      listUnsubscribeUrl: unsubscribeUrl,
     });
 
     const updated = await markBroadcastTestSent({

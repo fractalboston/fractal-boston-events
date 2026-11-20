@@ -189,6 +189,7 @@ export async function POST(
           html,
           from,
           replyTo: replyTo ?? undefined,
+          listUnsubscribeUrl: unsubscribeUrl,
         });
         // At-least-once delivery: a crash between SES accepting and this mark
         // re-sends to this one recipient on resume

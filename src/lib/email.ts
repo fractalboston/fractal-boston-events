@@ -1,8 +1,8 @@
 import {
-  SESClient,
+  SESv2Client,
   SendEmailCommand,
   type SendEmailCommandInput,
-} from "@aws-sdk/client-ses";
+} from "@aws-sdk/client-sesv2";
 import { BRAND_COLOR, EMAIL_FROM } from "@/lib/constants";
 import { sendDiscordEmailLog, sendDiscordInfo } from "@/lib/discord";
 import {
@@ -17,10 +17,10 @@ import type { LumaEvent } from "@/lib/luma";
 import { updateLastEmailedAt } from "@/lib/subscribers";
 import { getLumaEventUrl, joinAppUrl } from "@/lib/urls";
 
-let sesClient: SESClient | null = null;
+let sesClient: SESv2Client | null = null;
 
-function getSES(): SESClient {
-  sesClient ??= new SESClient({
+function getSES(): SESv2Client {
+  sesClient ??= new SESv2Client({
     region: env.AWS_REGION,
     credentials: {
       accessKeyId: env.AWS_ACCESS_KEY_ID,
@@ -65,37 +65,66 @@ function isQuotaError(error: unknown): boolean {
   );
 }
 
+/**
+ * RFC 2369 List-Unsubscribe header pointing at the existing unsubscribe
+ * page, which requires a confirm click. Do not add List-Unsubscribe-Post
+ * (RFC 8058 one-click) unless that page becomes one-click.
+ */
+export type ListUnsubscribeHeader = {
+  Name: string;
+  Value: string;
+};
+
+export function listUnsubscribeHeaders(
+  listUnsubscribeUrl: string | undefined
+): ListUnsubscribeHeader[] | undefined {
+  if (listUnsubscribeUrl === undefined || listUnsubscribeUrl === "") {
+    return undefined;
+  }
+  return [
+    {
+      Name: "List-Unsubscribe",
+      Value: `<${listUnsubscribeUrl}>`,
+    },
+  ];
+}
+
 async function sendViaSes({
   to,
   subject,
   html,
   from,
   replyTo,
+  listUnsubscribeUrl,
 }: {
   to: string;
   subject: string;
   html: string;
   from: string;
   replyTo?: string;
+  listUnsubscribeUrl?: string;
 }): Promise<void> {
   const ses = getSES();
   try {
     const params: SendEmailCommandInput = {
-      Source: from,
+      FromEmailAddress: from,
       Destination: {
         ToAddresses: [to],
       },
       ReplyToAddresses: replyTo !== undefined ? [replyTo] : undefined,
-      Message: {
-        Subject: {
-          Data: subject,
-          Charset: "UTF-8",
-        },
-        Body: {
-          Html: {
-            Data: html,
+      Content: {
+        Simple: {
+          Subject: {
+            Data: subject,
             Charset: "UTF-8",
           },
+          Body: {
+            Html: {
+              Data: html,
+              Charset: "UTF-8",
+            },
+          },
+          Headers: listUnsubscribeHeaders(listUnsubscribeUrl),
         },
       },
     };
@@ -125,17 +154,25 @@ async function sendEmailIfEnabled({
   to,
   subject,
   html,
+  listUnsubscribeUrl,
 }: {
   to: string;
   subject: string;
   html: string;
+  listUnsubscribeUrl?: string;
 }): Promise<void> {
   if (!env.EMAIL_ENABLED) {
     console.warn(`Trying to email ${to} but EMAIL_ENABLED is false`);
     return;
   }
 
-  await sendViaSes({ to, subject, html, from: EMAIL_FROM });
+  await sendViaSes({
+    to,
+    subject,
+    html,
+    from: EMAIL_FROM,
+    listUnsubscribeUrl,
+  });
 }
 
 /**
@@ -151,14 +188,16 @@ export async function sendBroadcastEmail({
   html,
   from,
   replyTo,
+  listUnsubscribeUrl,
 }: {
   to: string;
   subject: string;
   html: string;
   from: string;
   replyTo?: string;
+  listUnsubscribeUrl: string;
 }): Promise<void> {
-  await sendViaSes({ to, subject, html, from, replyTo });
+  await sendViaSes({ to, subject, html, from, replyTo, listUnsubscribeUrl });
 }
 
 export async function sendVerificationEmail(
@@ -205,6 +244,7 @@ export async function sendWelcomeEmail(
     to: email,
     subject: "Welcome to Fractal, here's what's coming up",
     html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
+    listUnsubscribeUrl: unsubscribeUrl,
   });
 
   await sendDiscordEmailLog({
@@ -232,6 +272,7 @@ export async function sendAlreadySubscribedEmail(
     to: email,
     subject: "You're Subscribed",
     html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
+    listUnsubscribeUrl: unsubscribeUrl,
   });
 
   await sendDiscordEmailLog({
@@ -264,6 +305,7 @@ export async function sendWeeklyDigest(
     to: email,
     subject: `This Week at Fractal (${eventCount} event${events.length === 1 ? "" : "s"})`,
     html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
+    listUnsubscribeUrl: unsubscribeUrl,
   });
 
   if (!skipLogging) {
@@ -300,6 +342,7 @@ export async function sendNewEventAlert(
     to: email,
     subject: `New Event: ${event.event.name}`,
     html: wrapInEmailTemplate(buildEmailBody(content, unsubscribeUrl)),
+    listUnsubscribeUrl: unsubscribeUrl,
   });
 
   if (!skipLogging) {
