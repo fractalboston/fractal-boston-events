@@ -139,3 +139,4 @@ pnpm email:test your-email@example.com
 - [AWS SES Documentation](https://docs.aws.amazon.com/ses/)
 - [SES Sending Authorization](https://docs.aws.amazon.com/ses/latest/dg/sending-authorization.html)
 - [SES Best Practices](https://docs.aws.amazon.com/ses/latest/dg/best-practices.html)
+- [Bounce and complaint handling](./ses-bounce-handling.md) (SNS webhook, configuration set event destination, Vercel env vars)

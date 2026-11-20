@@ -128,6 +128,12 @@ async function sendViaSes({
         },
       },
     };
+    if (
+      env.SES_CONFIGURATION_SET !== undefined &&
+      env.SES_CONFIGURATION_SET !== ""
+    ) {
+      params.ConfigurationSetName = env.SES_CONFIGURATION_SET;
+    }
 
     const command = new SendEmailCommand(params);
     const result = await ses.send(command);

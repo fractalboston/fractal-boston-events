@@ -70,6 +70,42 @@ export async function getSubscriberByEmail(
     .executeTakeFirst();
 }
 
+/**
+ * Record a permanent bounce or a complaint from SES. Matching is
+ * case-insensitive because stored emails are lowercased. A complaint is kept
+ * even if a later bounce arrives for the same address.
+ */
+export async function applySuppressionStatus({
+  email,
+  status,
+}: {
+  email: string;
+  status: "bounced" | "complained";
+}): Promise<Subscriber | undefined> {
+  const normalized = email.trim().toLowerCase();
+  if (normalized === "") {
+    return undefined;
+  }
+
+  const existing = await getSubscriberByEmail(normalized);
+  if (existing === undefined) {
+    return undefined;
+  }
+  if (status === "bounced" && existing.status === "complained") {
+    return existing;
+  }
+  if (existing.status === status) {
+    return existing;
+  }
+
+  return db
+    .updateTable("subscribers")
+    .set({ status })
+    .where("email", "=", normalized)
+    .returningAll()
+    .executeTakeFirst();
+}
+
 /** Internal admin lookup by subscriber id. Never use in public subscription flows. */
 export async function getSubscriberById(
   id: string

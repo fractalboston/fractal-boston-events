@@ -19,6 +19,8 @@ export type Env = {
   CRON_SECRET?: string;
   ADMIN_API_KEY?: string;
   VERCEL: string | undefined;
+  SES_SNS_TOPIC_ARN?: string;
+  SES_CONFIGURATION_SET?: string;
 };
 
 const config: Env = {
@@ -49,6 +51,8 @@ const config: Env = {
   CRON_SECRET: env.get("CRON_SECRET").asString(),
   ADMIN_API_KEY: env.get("ADMIN_API_KEY").asString(),
   VERCEL: env.get("VERCEL").asString(),
+  SES_SNS_TOPIC_ARN: env.get("SES_SNS_TOPIC_ARN").asString(),
+  SES_CONFIGURATION_SET: env.get("SES_CONFIGURATION_SET").asString(),
 };
 
 export { config as env };
