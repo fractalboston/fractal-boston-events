@@ -24,6 +24,7 @@ export type SubscribersTable = {
   source: "form" | "luma" | "substack" | "manual";
   last_emailed_at: Date | null;
   last_broadcast_at: Date | null;
+  verification_sent_at: Date | null;
 };
 export type Subscriber = Degenerate<SubscribersTable>;
 

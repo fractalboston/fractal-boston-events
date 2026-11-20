@@ -6,6 +6,7 @@ import {
   sendBadRequest,
   sendCreated,
   sendInternalError,
+  sendNeedsConfirmation,
   sendNotFound,
   sendSuccess,
   subscribeBodySchema,
@@ -19,8 +20,8 @@ import {
   getSubscriberByEmail,
   getSubscriberByToken,
   isResubscribeEligible,
-  verifySubscriber,
 } from "@/lib/subscribers";
+import { processVerificationRequest } from "@/lib/verification";
 
 export function OPTIONS(): Response {
   return handleOptionsRequest();
@@ -56,7 +57,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     if ("token" in parsed.data) {
-      const { token } = parsed.data;
+      const { token, confirmed } = parsed.data;
       const existing = await getSubscriberByToken(token);
       if (existing === undefined) {
         return sendNotFound("Token not found");
@@ -98,8 +99,14 @@ export async function POST(request: Request): Promise<Response> {
         }
       }
       if (existing.status === "pending") {
-        const verified = await verifySubscriber(existing.token);
-        if (verified !== undefined) {
+        const result = await processVerificationRequest({
+          token: existing.token,
+          confirmed: confirmed === true,
+        });
+        if (result.kind === "needs_confirmation") {
+          return sendNeedsConfirmation();
+        }
+        if (result.kind === "verified" || result.kind === "already_verified") {
           await sendDiscordInfo({
             webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
             message: existing.email,

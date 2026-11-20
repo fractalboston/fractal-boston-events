@@ -70,6 +70,14 @@ export async function getSubscriberByEmail(
     .executeTakeFirst();
 }
 
+export async function markVerificationSentAt(email: string): Promise<void> {
+  await db
+    .updateTable("subscribers")
+    .set({ verification_sent_at: sql`now()` })
+    .where("email", "=", email.toLowerCase())
+    .execute();
+}
+
 /**
  * Record a permanent bounce or a complaint from SES. Matching is
  * case-insensitive because stored emails are lowercased. A complaint is kept
