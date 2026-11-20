@@ -238,6 +238,22 @@ describe("broadcastAudienceStatuses", () => {
       })
     ).toEqual(["pending"]);
   });
+
+  it("never includes bounced, complained, or unsubscribed", () => {
+    const scopes = ["all", "verified", "pending"] as const;
+    const tags = [null, "expo"] as const;
+    for (const audience_tag of tags) {
+      for (const audience_scope of scopes) {
+        const statuses = broadcastAudienceStatuses({
+          audience_tag,
+          audience_scope,
+        });
+        expect(statuses).not.toContain("bounced");
+        expect(statuses).not.toContain("complained");
+        expect(statuses).not.toContain("unsubscribed");
+      }
+    }
+  });
 });
 
 describe("describeAudience", () => {
