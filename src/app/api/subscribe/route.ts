@@ -2,6 +2,7 @@ import { db } from "@/db/db";
 import {
   type SubscribeResponse,
   handleOptionsRequest,
+  isSubscribeHoneypotFilled,
   sendBadRequest,
   sendCreated,
   sendInternalError,
@@ -37,6 +38,18 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!parsed.success) {
     return sendBadRequest("Provide either a valid email or a token");
+  }
+
+  if (
+    "email" in parsed.data &&
+    isSubscribeHoneypotFilled(parsed.data.website)
+  ) {
+    console.warn(
+      `Subscribe honeypot triggered for ${parsed.data.email}; no subscriber created`
+    );
+    return sendCreated<SubscribeResponse>({
+      message: "Verification email sent",
+    });
   }
 
   const appUrl = env.APP_URL;

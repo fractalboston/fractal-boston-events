@@ -5,9 +5,19 @@ import { isDevelopment } from "@/lib/env";
 import { subscriberTokenParamSchema } from "@/lib/subscriberToken";
 
 export const subscribeBodySchema = z.union([
-  z.object({ email: z.email() }),
+  z.object({
+    email: z.email(),
+    website: z.string().optional(),
+  }),
   z.object({ token: subscriberTokenParamSchema }),
 ]);
+
+/** True when the signup honeypot field was filled in (typical of bots). */
+export function isSubscribeHoneypotFilled(
+  website: string | undefined
+): boolean {
+  return website !== undefined && website.trim() !== "";
+}
 
 export const verifyBodySchema = z.object({
   token: subscriberTokenParamSchema,
