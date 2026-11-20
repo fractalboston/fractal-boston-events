@@ -9,7 +9,10 @@ export const subscribeBodySchema = z.union([
     email: z.email(),
     website: z.string().optional(),
   }),
-  z.object({ token: subscriberTokenParamSchema }),
+  z.object({
+    token: subscriberTokenParamSchema,
+    confirmed: z.boolean().optional(),
+  }),
 ]);
 
 /** True when the signup honeypot field was filled in (typical of bots). */
@@ -21,6 +24,7 @@ export function isSubscribeHoneypotFilled(
 
 export const verifyBodySchema = z.object({
   token: subscriberTokenParamSchema,
+  confirmed: z.boolean().optional(),
 });
 
 export const unsubscribeBodySchema = z.object({
@@ -52,7 +56,20 @@ export type ApiSuccessResponse<T> = {
 export type ApiErrorResponse = {
   success: false;
   error: string;
+  needsConfirmation?: true;
 };
+
+export const NEEDS_CONFIRMATION_MESSAGE =
+  "Please confirm your subscription using the button on this page. If you don't see a button yet, reload this page in a few minutes to finish signing up.";
+
+export function sendNeedsConfirmation(): NextResponse<ApiErrorResponse> {
+  const body: ApiErrorResponse = {
+    success: false,
+    error: NEEDS_CONFIRMATION_MESSAGE,
+    needsConfirmation: true,
+  };
+  return addCorsHeaders(NextResponse.json(body, { status: 200 }));
+}
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 

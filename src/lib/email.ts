@@ -14,7 +14,7 @@ import {
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
 import type { LumaEvent } from "@/lib/luma";
-import { updateLastEmailedAt } from "@/lib/subscribers";
+import { markVerificationSentAt, updateLastEmailedAt } from "@/lib/subscribers";
 import { getLumaEventUrl, joinAppUrl } from "@/lib/urls";
 
 let sesClient: SESv2Client | null = null;
@@ -229,6 +229,7 @@ export async function sendVerificationEmail(
     subject: "Verify your Fractal Events subscription",
     html: wrapInEmailTemplate(buildEmailBody(content)),
   });
+  await markVerificationSentAt(email);
 }
 
 export async function sendWelcomeEmail(

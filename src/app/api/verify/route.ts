@@ -3,6 +3,7 @@ import {
   handleOptionsRequest,
   sendBadRequest,
   sendInternalError,
+  sendNeedsConfirmation,
   sendNotFound,
   sendSuccess,
   verifyBodySchema,
@@ -11,7 +12,7 @@ import { sendDiscordError, sendDiscordInfo } from "@/lib/discord";
 import { sendWelcomeEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { getReportableEvents } from "@/lib/luma";
-import { getSubscriberByToken, verifySubscriber } from "@/lib/subscribers";
+import { processVerificationRequest } from "@/lib/verification";
 
 export function OPTIONS(): Response {
   return handleOptionsRequest();
@@ -31,48 +32,52 @@ export async function POST(request: Request): Promise<Response> {
     return sendBadRequest("Invalid token");
   }
 
-  const { token } = parsed.data;
+  const { token, confirmed } = parsed.data;
 
   try {
-    const existing = await getSubscriberByToken(token);
+    const result = await processVerificationRequest({
+      token,
+      confirmed: confirmed === true,
+    });
 
-    if (existing === undefined) {
+    if (result.kind === "not_found") {
       return sendNotFound("Token not found");
     }
 
-    if (existing.status === "verified") {
+    if (result.kind === "needs_confirmation") {
+      return sendNeedsConfirmation();
+    }
+
+    if (result.kind === "not_pending") {
+      if (result.status === "unsubscribed") {
+        return sendBadRequest("This email has been unsubscribed");
+      }
+      return sendNotFound("Token not found or already verified");
+    }
+
+    if (result.kind === "already_verified") {
       await sendDiscordInfo({
         webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-        message: existing.email,
+        message: result.subscriber.email,
         title: "Already Verified",
       });
       return sendSuccess<VerifyResponse>({
         message: "Already verified",
-        email: existing.email,
+        email: result.subscriber.email,
       });
-    }
-
-    if (existing.status === "unsubscribed") {
-      return sendBadRequest("This email has been unsubscribed");
-    }
-
-    const subscriber = await verifySubscriber(existing.token);
-
-    if (subscriber === undefined) {
-      return sendNotFound("Token not found or already verified");
     }
 
     await sendDiscordInfo({
       webhookUrl: env.DISCORD_LOGGING_WEBHOOK_URL,
-      message: subscriber.email,
+      message: result.subscriber.email,
       title: "Verified",
     });
 
     try {
       const events = await getReportableEvents();
       await sendWelcomeEmail(
-        subscriber.email,
-        subscriber.token,
+        result.subscriber.email,
+        result.subscriber.token,
         events,
         env.APP_URL
       );
@@ -82,7 +87,7 @@ export async function POST(request: Request): Promise<Response> {
 
     return sendSuccess<VerifyResponse>({
       message: "Email verified successfully",
-      email: subscriber.email,
+      email: result.subscriber.email,
     });
   } catch (error) {
     console.error("Verify error:", error);
